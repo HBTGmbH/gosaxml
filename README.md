@@ -8,7 +8,7 @@ on all encoded XML elements, like `encoding/xml` does.
 # Get it
 
 ```shell
-go get -u github.com/HBTGmbH/gosaxml@v0.0.1
+go get -u github.com/HBTGmbH/gosaxml
 ```
 
 # Features 
