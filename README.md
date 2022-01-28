@@ -17,31 +17,41 @@ go get -u github.com/HBTGmbH/gosaxml@v0.0.1
 * low-allocation stream encoding of XML elements (to `io.Writer`)
 * tidying of XML namespace declarations of the encoder input
 
-# Simple example
+# Simple examples
 
 ## Decode and re-encode
-The following example decodes from a given `io.Reader` and encodes the same tokens
+The following example (in the form of a Go test) decodes from a given `io.Reader` and encodes the same tokens
 into a provided `io.Writer`:
 ```go
-var r io.Reader = ...
-var w io.Writer = ...
-dec := gosaxml.NewDecoder(r)
-enc := gosaxml.NewEncoder(w)
-for {
-	// decode the next token
-	tk, err := dec.NextToken()
-	if err == io.EOF {
-		// io.EOF means end-of-file, so we are done
-		break
-	} else if err != nil {
-		// any other error is a real error
-		panic(err)
+func TestDecodeAndEncode(t *testing.T) {
+	// given
+	var r io.Reader = strings.NewReader(
+		`<a xmlns="http://mynamespace.org">
+		<b>Hi!</b>
+		<c></c>
+		</a>`)
+	var w bytes.Buffer
+	dec := gosaxml.NewDecoder(r)
+	enc := gosaxml.NewEncoder(&w)
+
+	// when
+	for {
+		tk, err := dec.NextToken()
+		if err == io.EOF {
+			break
+		}
+		assert.Nil(t, err)
+
+		err = enc.EncodeToken(tk)
+		assert.Nil(t, err)
 	}
-	
-	// encode the same token
-	err = enc.EncodeToken(tk)
-	if err != nil {
-		panic(err)
-	}
+
+	// then
+	assert.Equal(t,
+		`<a xmlns="http://mynamespace.org">
+		<b>Hi!</b>
+		<c/>
+		</a>`
+		w.String())
 }
 ```
