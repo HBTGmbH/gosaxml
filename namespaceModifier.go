@@ -158,15 +158,7 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 				if !bytes.Equal(prefix, attr.Name.Local) {
 					// we don't know that particular prefix but we know that namespace
 					// by another prefix, so establish a rewrite for the prefix
-					if prefixRewrites == nil {
-						prefixRewrites = make(map[string][]byte)
-					}
-					prefixRewrites[string(attr.Name.Local)] = prefix
-					// check if that element itself belongs to that prefix
-					if bytes.Equal(t.Name.Prefix, attr.Name.Local) {
-						// rewrite element prefix
-						t.Name.Prefix = prefix
-					}
+					addPrefixRewrite(&prefixRewrites, attr.Name.Local, prefix)
 				}
 				// we don't need the attribute anymore because we already had a prefix
 				continue
@@ -175,19 +167,13 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 			c := namespaceAliases[thiz.nextPrefix : thiz.nextPrefix+1]
 			thiz.f.newPrefixes++
 			thiz.nextPrefix++
-			if prefixRewrites == nil {
-				prefixRewrites = make(map[string][]byte)
-			}
-			prefixRewrites[string(attr.Name.Local)] = bs(c)
-			if ns == nil {
-				ns = make(map[string][]byte)
-			}
+			addPrefixRewrite(&prefixRewrites, attr.Name.Local, bs(c))
+			addNamespaceBinding(&ns, bs(c), attr.Value)
 			attr.Name.Local = bs(c)
-			ns[c] = append([]byte(nil), attr.Value...)
 		} else if attr.Name.Prefix == nil && bytes.Equal(attr.Name.Local, bs("xmlns")) {
 			// check if the element is already in that namespace, in which case
 			// we can simply omit the namespace.
-			currentNamespace := thiz.findNamespaceForPrefix([]byte{})
+			currentNamespace := thiz.findNamespaceForPrefix(nil)
 			if currentNamespace != nil {
 				continue
 			}
@@ -195,15 +181,15 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 			// can use the prefix instead and drop the namespace declaration
 			prefix := thiz.findPrefixForNamespace(attr.Value)
 			if prefix != nil {
+				// add prefix rewrite for "" -> prefix in order to remember
+				// that any elements without a prefix get the new prefix now
+				addPrefixRewrite(&prefixRewrites, nil, prefix)
 				t.Name.Prefix = prefix
 				continue
 			}
-			if ns == nil {
-				ns = make(map[string][]byte)
-			}
 			// this element uses a new namespace in which all
 			// unprefixed child elements will reside
-			ns[""] = append([]byte(nil), attr.Value...)
+			addNamespaceBinding(&ns, nil, attr.Value)
 		}
 		newAttributes = append(newAttributes, attr)
 	}
@@ -212,6 +198,20 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 	// store established new namespaces and prefix rewrites
 	thiz.f.ns = ns
 	thiz.f.prefixAliases = prefixRewrites
+}
+
+func addNamespaceBinding(ns *map[string][]byte, prefix, namespace []byte) {
+	if *ns == nil {
+		*ns = make(map[string][]byte)
+	}
+	(*ns)[string(prefix)] = namespace
+}
+
+func addPrefixRewrite(prefixRewrites *map[string][]byte, original, prefix []byte) {
+	if *prefixRewrites == nil {
+		*prefixRewrites = make(map[string][]byte)
+	}
+	(*prefixRewrites)[string(original)] = prefix
 }
 
 func (thiz NamespaceModifier) NamespaceOfToken(t *Token) []byte {

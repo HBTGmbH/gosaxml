@@ -31,6 +31,28 @@ func BenchmarkNamespaceAlias1Level(b *testing.B) {
 	}
 }
 
+func TestNamespacePrefixedAndUnprefixed(t *testing.T) {
+	// given
+	bb := &bytes.Buffer{}
+	dec := NewDecoder(strings.NewReader(
+		"<ns:a xmlns:ns=\"https://mynamespace\">" +
+			"<b xmlns=\"https://mynamespace\">" +
+			"<c />" +
+			"</b>" +
+			"</ns:a>"))
+	enc := NewEncoder(bb, NewNamespaceModifier())
+
+	// when
+	decodeEncode(t, dec, enc)
+
+	// then
+	assert.Equal(t, "<a:a xmlns:a=\"https://mynamespace\">"+
+		"<a:b>"+
+		"<a:c/>"+
+		"</a:b>"+
+		"</a:a>", bb.String())
+}
+
 func TestNamespaceAlias1Level(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
