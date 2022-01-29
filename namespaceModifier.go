@@ -65,8 +65,7 @@ func (thiz *NamespaceModifier) processElementName(t *Token) {
 func (thiz *NamespaceModifier) findNamespaceForPrefix(prefix []byte) []byte {
 	// scan all frames up to the top
 	for i := len(thiz.nsKeys) - 1; i >= 0; i-- {
-		nsKey := thiz.nsKeys[i]
-		if bytes.Equal(nsKey, prefix) {
+		if bytes.Equal(thiz.nsKeys[i], prefix) {
 			return thiz.nsVals[i]
 		}
 	}

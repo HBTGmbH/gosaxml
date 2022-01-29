@@ -13,15 +13,16 @@ func BenchmarkNextToken(b *testing.B) {
 	doc := "<a attr1=\"1\" attr2=\"2\" xmlns=\"https://mydomain.org\"/>"
 	r := strings.NewReader(doc)
 	dec := NewDecoder(r)
+	var tk Token
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
 		r.Reset(doc)
-		_, err1 := dec.NextToken()
+		err1 := dec.NextToken(&tk)
 		assert.Nil(b, err1)
-		_, err2 := dec.NextToken()
+		err2 := dec.NextToken(&tk)
 		assert.Nil(b, err2)
 	}
 }
@@ -30,17 +31,18 @@ func TestDecodeStartEnd(t *testing.T) {
 	// given
 	doc := "<a></a>"
 	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var t1, t2, t3 Token
 
 	// when
-	t1, err1 := dec.NextToken()
-	t2, err2 := dec.NextToken()
-	_, err3 := dec.NextToken()
+	err1 := dec.NextToken(&t1)
+	err2 := dec.NextToken(&t2)
+	err3 := dec.NextToken(&t3)
 
 	// then
 	assert.Nil(t, err1)
 	assert.Equal(t, startElement("a"), t1)
 	assert.Nil(t, err2)
-	assert.Equal(t, endElement("a"), t2)
+	assertEndElement(t, "a", t2)
 	assert.Equal(t, io.EOF, err3)
 }
 
@@ -48,21 +50,22 @@ func TestDecodeStartTextEnd(t *testing.T) {
 	// given
 	doc := "<a>Hello, World!</a>"
 	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var tk Token
 
 	// when
-	token, err := dec.NextToken()
+	err := dec.NextToken(&tk)
 	assert.Nil(t, err)
-	assert.Equal(t, startElement("a"), token)
+	assert.Equal(t, startElement("a"), tk)
 
-	token, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
-	assert.Equal(t, textElement("Hello, World!"), token)
+	assertTextElement(t, "Hello, World!", tk)
 
-	token, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
-	assert.Equal(t, endElement("a"), token)
+	assertEndElement(t, "a", tk)
 
-	_, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Equal(t, io.EOF, err)
 }
 
@@ -70,11 +73,12 @@ func TestDecodeStartEndWithPrefix(t *testing.T) {
 	// given
 	doc := "<ns1:a></ns1:a>"
 	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var t1, t2, t3 Token
 
 	// when
-	t1, err1 := dec.NextToken()
-	t2, err2 := dec.NextToken()
-	_, err3 := dec.NextToken()
+	err1 := dec.NextToken(&t1)
+	err2 := dec.NextToken(&t2)
+	err3 := dec.NextToken(&t3)
 
 	// then
 	assert.Nil(t, err1)
@@ -88,17 +92,18 @@ func TestDecodeStartEndImplicit(t *testing.T) {
 	// given
 	doc := "<a/>"
 	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var t1, t2, t3 Token
 
 	// when
-	t1, err1 := dec.NextToken()
-	t2, err2 := dec.NextToken()
-	_, err3 := dec.NextToken()
+	err1 := dec.NextToken(&t1)
+	err2 := dec.NextToken(&t2)
+	err3 := dec.NextToken(&t3)
 
 	// then
 	assert.Nil(t, err1)
 	assert.Equal(t, startElement("a"), t1)
 	assert.Nil(t, err2)
-	assert.Equal(t, endElement("a"), t2)
+	assertEndElement(t, "a", t2)
 	assert.Equal(t, io.EOF, err3)
 }
 
@@ -106,18 +111,19 @@ func TestDecodeNested(t *testing.T) {
 	// given
 	doc := "<a attr1=\"foo\"><b attr2=\"bar\"><c attr3=\"baz\"><d attr4=\"blubb\"></d></c></b></a>"
 	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var tk Token
 
 	// when / then
-	tk, err := dec.NextToken()
+	err := dec.NextToken(&tk)
 	assert.Nil(t, err)
 	assert.Equal(t, startElementWithAttr("a", "attr1", "foo"), tk)
-	tk, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
 	assert.Equal(t, startElementWithAttr("b", "attr2", "bar"), tk)
-	tk, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
 	assert.Equal(t, startElementWithAttr("c", "attr3", "baz"), tk)
-	tk, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
 	assert.Equal(t, startElementWithAttr("d", "attr4", "blubb"), tk)
 }
@@ -126,45 +132,40 @@ func TestDecodeNested2(t *testing.T) {
 	// given
 	doc := "<a attr1=\"foo\"><b1 attr21=\"bar1\" /><c11 attr311=\"baz11\" /><d111 attr4111=\"blubb111\"></d111></a>"
 	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var tk Token
 
 	// when / then
-	tk, err := dec.NextToken()
+	err := dec.NextToken(&tk)
 	assert.Nil(t, err)
 	assert.Equal(t, startElementWithAttr("a", "attr1", "foo"), tk)
-	tk, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
 	assert.Equal(t, startElementWithAttr("b1", "attr21", "bar1"), tk)
-	tk, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
-	assert.Equal(t, endElement("b1"), tk)
-	tk, err = dec.NextToken()
+	assertEndElement(t, "b1", tk)
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
 	assert.Equal(t, startElementWithAttr("c11", "attr311", "baz11"), tk)
-	tk, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
-	assert.Equal(t, endElement("c11"), tk)
-	tk, err = dec.NextToken()
+	assertEndElement(t, "c11", tk)
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
 	assert.Equal(t, startElementWithAttr("d111", "attr4111", "blubb111"), tk)
-	tk, err = dec.NextToken()
+	err = dec.NextToken(&tk)
 	assert.Nil(t, err)
-	assert.Equal(t, endElement("d111"), tk)
+	assertEndElement(t, "d111", tk)
 }
 
-func textElement(text string) Token {
-	return Token{
-		Kind:     TokenTypeTextElement,
-		ByteData: []byte(text),
-	}
+func assertTextElement(t *testing.T, text string, token Token) {
+	assert.Equal(t, uint8(TokenTypeTextElement), token.Kind)
+	assert.Equal(t, []byte(text), token.ByteData)
 }
 
-func endElement(local string) Token {
-	return Token{
-		Kind: TokenTypeEndElement,
-		Name: Name{
-			Local: []byte(local),
-		},
-	}
+func assertEndElement(t *testing.T, local string, token Token) {
+	assert.Equal(t, uint8(TokenTypeEndElement), token.Kind)
+	assert.Equal(t, []byte(local), token.Name.Local)
 }
 
 func startElement(local string) Token {

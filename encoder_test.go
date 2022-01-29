@@ -28,7 +28,7 @@ func BenchmarkEncodeStartTokenWithNamespaceModifier(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		enc.Reset(w)
-		err := enc.EncodeToken(token)
+		err := enc.EncodeToken(&token)
 		assert.Nil(b, err)
 	}
 }
@@ -63,9 +63,9 @@ func BenchmarkEncode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		enc.Reset(w)
-		err := enc.EncodeToken(token0)
+		err := enc.EncodeToken(&token0)
 		assert.Nil(b, err)
-		err = enc.EncodeToken(token1)
+		err = enc.EncodeToken(&token1)
 		assert.Nil(b, err)
 	}
 }
@@ -76,7 +76,7 @@ func TestEncodeStartElement(t *testing.T) {
 	enc := NewEncoder(w, NewNamespaceModifier())
 
 	// when
-	err := enc.EncodeToken(Token{
+	err := enc.EncodeToken(&Token{
 		Kind: TokenTypeStartElement,
 		Name: Name{
 			Local:  bs("a"),
@@ -102,7 +102,7 @@ func TestEncodeStartElementEndElement(t *testing.T) {
 	enc := NewEncoder(w, NewNamespaceModifier())
 
 	// when
-	err1 := enc.EncodeToken(Token{
+	err1 := enc.EncodeToken(&Token{
 		Kind: TokenTypeStartElement,
 		Name: Name{
 			Prefix: bs("c"),
@@ -116,7 +116,7 @@ func TestEncodeStartElementEndElement(t *testing.T) {
 			Value: bs("https://mynamespace"),
 		}},
 	})
-	err2 := enc.EncodeToken(Token{
+	err2 := enc.EncodeToken(&Token{
 		Kind: TokenTypeStartElement,
 		Name: Name{
 			Local: bs("b"),
@@ -128,11 +128,11 @@ func TestEncodeStartElementEndElement(t *testing.T) {
 			Value: bs("https://mynamespace"),
 		}},
 	})
-	err3 := enc.EncodeToken(Token{
+	err3 := enc.EncodeToken(&Token{
 		Kind:     TokenTypeTextElement,
 		ByteData: bs("Hello"),
 	})
-	err4 := enc.EncodeToken(Token{
+	err4 := enc.EncodeToken(&Token{
 		Kind: TokenTypeEndElement,
 		Name: Name{
 			Local: bs("b"),
@@ -144,7 +144,7 @@ func TestEncodeStartElementEndElement(t *testing.T) {
 			Value: bs("https://mynamespace"),
 		}},
 	})
-	err5 := enc.EncodeToken(Token{
+	err5 := enc.EncodeToken(&Token{
 		Kind: TokenTypeEndElement,
 		Name: Name{
 			Local: bs("a"),
@@ -172,7 +172,7 @@ func TestEncodeTwoNestedWithRedundantNamespace(t *testing.T) {
 	enc := NewEncoder(w, NewNamespaceModifier())
 
 	// when
-	err1 := enc.EncodeToken(Token{
+	err1 := enc.EncodeToken(&Token{
 		Kind: TokenTypeStartElement,
 		Name: Name{
 			Local:  bs("a"),
@@ -186,7 +186,7 @@ func TestEncodeTwoNestedWithRedundantNamespace(t *testing.T) {
 			Value: bs("https://mynamespace"),
 		}},
 	})
-	err2 := enc.EncodeToken(Token{
+	err2 := enc.EncodeToken(&Token{
 		Kind: TokenTypeStartElement,
 		Name: Name{
 			Local: bs("b"),
@@ -211,7 +211,7 @@ func TestEncodeTwoNestedWithRedundantNamespaceUnprefixed(t *testing.T) {
 	enc := NewEncoder(w, NewNamespaceModifier())
 
 	// when
-	err1 := enc.EncodeToken(Token{
+	err1 := enc.EncodeToken(&Token{
 		Kind: TokenTypeStartElement,
 		Name: Name{
 			Local: bs("a"),
@@ -223,7 +223,7 @@ func TestEncodeTwoNestedWithRedundantNamespaceUnprefixed(t *testing.T) {
 			Value: bs("https://mynamespace"),
 		}},
 	})
-	err2 := enc.EncodeToken(Token{
+	err2 := enc.EncodeToken(&Token{
 		Kind: TokenTypeStartElement,
 		Name: Name{
 			Local: bs("b"),

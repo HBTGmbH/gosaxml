@@ -13,6 +13,7 @@ func BenchmarkNamespaceAlias1Level(b *testing.B) {
 	r := strings.NewReader(input)
 	dec := NewDecoder(r)
 	enc := NewEncoder(io.Discard, NewNamespaceModifier())
+	var tk Token
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -21,11 +22,11 @@ func BenchmarkNamespaceAlias1Level(b *testing.B) {
 		r.Reset(input)
 		dec.Reset(r)
 		for {
-			tk, err := dec.NextToken()
+			err := dec.NextToken(&tk)
 			if err != nil {
 				break
 			}
-			err = enc.EncodeToken(tk)
+			err = enc.EncodeToken(&tk)
 			assert.Nil(b, err)
 		}
 	}
@@ -41,9 +42,10 @@ func TestNamespacePrefixedAndUnprefixed(t *testing.T) {
 			"</b>" +
 			"</ns:a>"))
 	enc := NewEncoder(bb, NewNamespaceModifier())
+	var tk Token
 
 	// when
-	decodeEncode(t, dec, enc)
+	decodeEncode(t, dec, enc, &tk)
 
 	// then
 	assert.Equal(t, "<a:a xmlns:a=\"https://mynamespace\">"+
@@ -62,9 +64,10 @@ func TestNamespaceAlias1Level(t *testing.T) {
 			"</ns1:b>" +
 			"</ns:a>"))
 	enc := NewEncoder(bb, NewNamespaceModifier())
+	var tk Token
 
 	// when
-	decodeEncode(t, dec, enc)
+	decodeEncode(t, dec, enc, &tk)
 
 	// then
 	assert.Equal(t, "<a:a xmlns:a=\"https://mynamespace\">"+
@@ -82,6 +85,7 @@ func BenchmarkSameNamespaceSideBySide(b *testing.B) {
 			"</ns:a>")
 	dec := NewDecoder(r)
 	enc := NewEncoder(io.Discard, NewNamespaceModifier())
+	var tk Token
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -90,13 +94,13 @@ func BenchmarkSameNamespaceSideBySide(b *testing.B) {
 		r.Seek(0, io.SeekStart)
 		dec.Reset(r)
 		for {
-			tk, err := dec.NextToken()
+			err := dec.NextToken(&tk)
 			if err == io.EOF {
 				break
 			} else if err != nil {
 				panic(err)
 			}
-			err = enc.EncodeToken(tk)
+			err = enc.EncodeToken(&tk)
 		}
 	}
 }
@@ -112,9 +116,10 @@ func TestSameNamespaceSideBySide(t *testing.T) {
 			"<ns1:b/>" +
 			"</ns:a>"))
 	enc := NewEncoder(bb, NewNamespaceModifier())
+	var tk Token
 
 	// when
-	decodeEncode(t, dec, enc)
+	decodeEncode(t, dec, enc, &tk)
 
 	// then
 	assert.Equal(t, "<a:a xmlns:a=\"https://mynamespace\">"+
@@ -133,9 +138,10 @@ func TestBeginTextEnd(t *testing.T) {
 			"Hello, World!" +
 			"</ns:a>"))
 	enc := NewEncoder(bb, NewNamespaceModifier())
+	var tk Token
 
 	// when
-	decodeEncode(t, dec, enc)
+	decodeEncode(t, dec, enc, &tk)
 
 	// then
 	assert.Equal(t, "<a:a xmlns:a=\"https://mynamespace\">"+
@@ -162,9 +168,10 @@ func TestElementsAndAttributes(t *testing.T) {
 			"</book>" +
 			"</bookstore>"))
 	enc := NewEncoder(bb, NewNamespaceModifier())
+	var tk Token
 
 	// when
-	decodeEncode(t, dec, enc)
+	decodeEncode(t, dec, enc, &tk)
 
 	// then
 	assert.Equal(t, "<bookstore>"+
@@ -201,6 +208,7 @@ func BenchmarkElementsAndAttributes(b *testing.B) {
 			"</bookstore>")
 	dec := NewDecoder(r)
 	enc := NewEncoder(io.Discard, NewNamespaceModifier())
+	var tk Token
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -209,20 +217,20 @@ func BenchmarkElementsAndAttributes(b *testing.B) {
 		r.Seek(0, io.SeekStart)
 		dec.Reset(r)
 		for {
-			tk, err := dec.NextToken()
+			err := dec.NextToken(&tk)
 			if err == io.EOF {
 				break
 			} else if err != nil {
 				panic(err)
 			}
-			_ = enc.EncodeToken(tk)
+			_ = enc.EncodeToken(&tk)
 		}
 	}
 }
 
-func decodeEncode(t *testing.T, dec Decoder, enc *Encoder) {
+func decodeEncode(t *testing.T, dec Decoder, enc *Encoder, tk *Token) {
 	for {
-		tk, err := dec.NextToken()
+		err := dec.NextToken(tk)
 		if err == io.EOF {
 			break
 		} else if err != nil {

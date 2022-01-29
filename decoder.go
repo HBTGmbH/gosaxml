@@ -7,8 +7,13 @@ import (
 	"io"
 )
 
+// Decoder decodes an XML input stream into Token values.
 type Decoder interface {
-	NextToken() (Token, error)
+	// NextToken decodes and stores the next Token into
+	// the provided Token pointer.
+	NextToken(t *Token) error
+
+	// Reset resets the Decoder to the given io.Reader.
 	Reset(r io.Reader)
 }
 
@@ -60,14 +65,14 @@ func (thiz *decoder) skipWhitespaces() error {
 	}
 }
 
-func (thiz *decoder) NextToken() (Token, error) {
+func (thiz *decoder) NextToken(t *Token) error {
 	var err error
 	var b byte
 	for {
 		// read next character
 		b, err = thiz.r.ReadByte()
 		if err != nil {
-			return Token{}, err
+			return err
 		}
 		switch b {
 		case '>':
@@ -81,55 +86,59 @@ func (thiz *decoder) NextToken() (Token, error) {
 			// name that we used in the previous StartElement.
 			_, err = thiz.r.Discard(1)
 			if err != nil {
-				return Token{}, err
+				return err
 			}
-			return thiz.decodeEndElement(thiz.lastOpen, nil)
+			return thiz.decodeEndElement(t, thiz.lastOpen)
 		case '<':
 			b, err = thiz.r.ReadByte()
 			if err != nil {
-				return Token{}, err
+				return err
 			}
 			switch b {
 			case '?':
-				return thiz.decodeProcInst()
+				return thiz.decodeProcInst(t)
 			case '!':
 				// CDATA or comment
 				b, err = thiz.r.ReadByte()
 				if err != nil {
-					return Token{}, err
+					return err
 				}
 				switch b {
 				case '-':
 					err = thiz.ignoreComment()
 					if err != nil {
-						return Token{}, err
+						return err
 					}
 				case '[':
-					return thiz.readCDATA()
+					return thiz.readCDATA(t)
 				default:
-					return Token{}, errors.New("invalid XML: comment or CDATA expected")
+					return errors.New("invalid XML: comment or CDATA expected")
 				}
 			case '/':
-				return thiz.decodeEndElement(thiz.readName())
+				name, err := thiz.readName()
+				if err != nil {
+					return err
+				}
+				return thiz.decodeEndElement(t, name)
 			default:
 				err = thiz.r.UnreadByte()
 				if err != nil {
-					return Token{}, err
+					return err
 				}
-				return thiz.decodeStartElement()
+				return thiz.decodeStartElement(t)
 			}
 		default:
 			err = thiz.r.UnreadByte()
 			if err != nil {
-				return Token{}, err
+				return err
 			}
-			return thiz.decodeText()
+			return thiz.decodeText(t)
 		}
 	}
 }
 
-func (decoder) decodeProcInst() (Token, error) {
-	return Token{}, errors.New("NYI")
+func (decoder) decodeProcInst(t *Token) error {
+	return errors.New("NYI")
 }
 
 func (thiz decoder) ignoreComment() error {
@@ -161,72 +170,66 @@ func (thiz decoder) ignoreComment() error {
 	}
 }
 
-func (thiz *decoder) decodeEndElement(name Name, err error) (Token, error) {
-	if err != nil {
-		return Token{}, err
-	}
+func (thiz *decoder) decodeEndElement(t *Token, name Name) error {
 	thiz.top--
 	end := len(thiz.attrs) - thiz.numAttributes[thiz.top]
 	thiz.attrs = thiz.attrs[0:end]
 	thiz.bb = thiz.bb[:thiz.bbOffset[thiz.top]]
-	return Token{
-		Kind: TokenTypeEndElement,
-		Name: name,
-	}, nil
+	t.Kind = TokenTypeEndElement
+	t.Name = name
+	return nil
 }
 
-func (thiz *decoder) decodeStartElement() (Token, error) {
+func (thiz *decoder) decodeStartElement(t *Token) error {
 	thiz.numAttributes[thiz.top] = 0
 	if thiz.top > 0 {
 		thiz.bbOffset[thiz.top] = len(thiz.bb)
 	}
 	name, err := thiz.readName()
 	if err != nil {
-		return Token{}, err
+		return err
 	}
 	attributes, err := thiz.readAttributes()
 	if err != nil {
-		return Token{}, err
+		return err
 	}
 	thiz.lastOpen = name
 	thiz.top++
-	return Token{
-		Kind: TokenTypeStartElement,
-		Name: name,
-		Attr: attributes,
-	}, nil
+	t.Kind = TokenTypeStartElement
+	t.Name = name
+	t.Attr = attributes
+	return nil
 }
 
-func (thiz *decoder) decodeText() (Token, error) {
+func (thiz *decoder) decodeText(t *Token) error {
 	i := len(thiz.bb)
 	for {
 		b, err := thiz.r.ReadByte()
 		if err != nil {
-			return Token{}, err
+			return err
 		}
 		switch b {
 		case '<':
 			err = thiz.r.UnreadByte()
 			if err != nil {
-				return Token{}, err
+				return err
 			}
-			return Token{
-				Kind:     TokenTypeTextElement,
-				ByteData: thiz.bb[i:len(thiz.bb)],
-			}, nil
+			t.Kind = TokenTypeTextElement
+			t.ByteData = thiz.bb[i:len(thiz.bb)]
+			return nil
 		default:
 			thiz.bb = append(thiz.bb, b)
 		}
 	}
 }
 
-func (thiz decoder) readCDATA() (Token, error) {
+func (thiz decoder) readCDATA(t *Token) error {
 	// discard "CDATA["
 	_, err := thiz.r.Discard(6)
 	if err != nil {
-		return Token{}, err
+		return err
 	}
-	return Token{}, errors.New("NYI")
+	return errors.New("NYI")
 }
 
 func (thiz *decoder) readName() (Name, error) {

@@ -48,7 +48,7 @@ func (thiz *Encoder) Reset(w io.Writer) {
 	}
 }
 
-func (thiz *Encoder) EncodeToken(t Token) error {
+func (thiz *Encoder) EncodeToken(t *Token) error {
 	switch t.Kind {
 	case TokenTypeStartElement:
 		err := thiz.encodeStartElement(t)
@@ -81,7 +81,7 @@ func (thiz *Encoder) EncodeToken(t Token) error {
 	return nil
 }
 
-func (thiz *Encoder) encodeStartElement(t Token) error {
+func (thiz *Encoder) encodeStartElement(t *Token) error {
 	err := thiz.endLastStartElement()
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func (thiz *Encoder) encodeStartElement(t Token) error {
 		return err
 	}
 
-	err = thiz.callMiddlewares(&t)
+	err = thiz.callMiddlewares(t)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (thiz *Encoder) encodeStartElement(t Token) error {
 	return nil
 }
 
-func (thiz *Encoder) encodeEndElement(t Token) error {
+func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if thiz.lastStartElement {
 		// the last seen token was a StartElement, so this
 		// token can only be its accompanying EndElement.
@@ -138,10 +138,10 @@ func (thiz *Encoder) encodeEndElement(t Token) error {
 		if err != nil {
 			return err
 		}
-		return thiz.callMiddlewares(&t)
+		return thiz.callMiddlewares(t)
 	}
 
-	err := thiz.callMiddlewares(&t)
+	err := thiz.callMiddlewares(t)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func (thiz Encoder) writeString(s []byte, singleQuote bool) error {
 	return nil
 }
 
-func (thiz *Encoder) encodeTextElement(t Token) error {
+func (thiz *Encoder) encodeTextElement(t *Token) error {
 	err := thiz.endLastStartElement()
 	if err != nil {
 		return err
@@ -233,7 +233,7 @@ func (thiz *Encoder) endLastStartElement() error {
 	return nil
 }
 
-func (thiz *Encoder) encodeDirective(t Token) error {
+func (thiz *Encoder) encodeDirective(t *Token) error {
 	err := thiz.endLastStartElement()
 	if err != nil {
 		return err
