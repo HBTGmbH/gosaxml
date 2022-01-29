@@ -10,7 +10,7 @@ import (
 
 func BenchmarkNextToken(b *testing.B) {
 	// given
-	doc := "<a xmlns=\"https://mydomain.org\"/>"
+	doc := "<a attr1=\"1\" attr2=\"2\" xmlns=\"https://mydomain.org\"/>"
 	r := strings.NewReader(doc)
 	dec := NewDecoder(r)
 

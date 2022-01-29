@@ -6,12 +6,10 @@ type NamespaceModifier struct {
 	nsKeys [][]byte
 	nsVals [][]byte
 	nsOffs []int
-	nsTop  int
 
 	prefixAliasesKeys [][]byte
 	prefixAliasesVals [][]byte
 	prefixAliasesOffs []int
-	prefixAliasesTop  int
 
 	openNames []Name
 
@@ -20,12 +18,12 @@ type NamespaceModifier struct {
 
 func NewNamespaceModifier() *NamespaceModifier {
 	return &NamespaceModifier{
-		nsKeys: make([][]byte, 32),
-		nsVals: make([][]byte, 32),
+		nsKeys: make([][]byte, 0, 32),
+		nsVals: make([][]byte, 0, 32),
 		nsOffs: make([]int, 32),
 
-		prefixAliasesKeys: make([][]byte, 32),
-		prefixAliasesVals: make([][]byte, 32),
+		prefixAliasesKeys: make([][]byte, 0, 32),
+		prefixAliasesVals: make([][]byte, 0, 32),
 		prefixAliasesOffs: make([]int, 32),
 
 		openNames: make([]Name, 32),
@@ -66,14 +64,10 @@ func (thiz *NamespaceModifier) processElementName(t *Token) {
 // This is the reverse operation of findPrefixForNamespace.
 func (thiz *NamespaceModifier) findNamespaceForPrefix(prefix []byte) []byte {
 	// scan all frames up to the top
-	for t := thiz.top; t > 0; t-- {
-		i := thiz.nsOffs[t-1]
-		j := thiz.nsOffs[t]
-		for k := j - 1; k >= i; k-- {
-			nsKey := thiz.nsKeys[k]
-			if bytes.Equal(nsKey, prefix) {
-				return thiz.nsVals[k]
-			}
+	for i := len(thiz.nsKeys) - 1; i >= 0; i-- {
+		nsKey := thiz.nsKeys[i]
+		if bytes.Equal(nsKey, prefix) {
+			return thiz.nsVals[i]
 		}
 	}
 	return nil
@@ -83,14 +77,9 @@ func (thiz *NamespaceModifier) findNamespaceForPrefix(prefix []byte) []byte {
 // This is the reverse operation of findNamespaceForPrefix.
 func (thiz *NamespaceModifier) findPrefixForNamespace(namespace []byte) []byte {
 	// scan all frames up to the top
-	for t := thiz.top; t > 0; t-- {
-		i := thiz.nsOffs[t-1]
-		j := thiz.nsOffs[t]
-		for k := j - 1; k >= i; k-- {
-			nsVal := thiz.nsVals[k]
-			if bytes.Equal(nsVal, namespace) {
-				return thiz.nsKeys[k]
-			}
+	for i := len(thiz.nsKeys) - 1; i >= 0; i-- {
+		if bytes.Equal(thiz.nsVals[i], namespace) {
+			return thiz.nsKeys[i]
 		}
 	}
 	return nil
@@ -101,14 +90,9 @@ func (thiz *NamespaceModifier) findPrefixForNamespace(namespace []byte) []byte {
 // has been replaced with a (possibly) shorter alternative.
 func (thiz *NamespaceModifier) findPrefixAlias(prefix []byte) []byte {
 	// scan all frames up to the top
-	for t := thiz.top; t > 0; t-- {
-		i := thiz.prefixAliasesOffs[t-1]
-		j := thiz.prefixAliasesOffs[t]
-		for k := j - 1; k >= i; k-- {
-			prefixAliasesKey := thiz.prefixAliasesKeys[k]
-			if bytes.Equal(prefixAliasesKey, prefix) {
-				return thiz.prefixAliasesVals[k]
-			}
+	for i := len(thiz.prefixAliasesKeys) - 1; i >= 0; i-- {
+		if bytes.Equal(thiz.prefixAliasesKeys[i], prefix) {
+			return thiz.prefixAliasesVals[i]
 		}
 	}
 	return nil
@@ -122,6 +106,12 @@ func (thiz *NamespaceModifier) pushFrame() {
 
 func (thiz *NamespaceModifier) popFrame() {
 	thiz.top--
+	off := thiz.nsOffs[thiz.top]
+	thiz.nsKeys = thiz.nsKeys[:off]
+	thiz.nsVals = thiz.nsVals[:off]
+	off = thiz.prefixAliasesOffs[thiz.top]
+	thiz.prefixAliasesKeys = thiz.prefixAliasesKeys[:off]
+	thiz.prefixAliasesVals = thiz.prefixAliasesVals[:off]
 }
 
 // processNamespaces scans the attributes of the given token for namespace declarations,
@@ -146,7 +136,7 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 				continue
 			}
 			// wo don't know the prefix, but we want to rewrite it
-			nextPrefixAlias := thiz.prefixAliasesOffs[thiz.top]
+			nextPrefixAlias := len(thiz.prefixAliasesKeys)
 			c := namespaceAliases[nextPrefixAlias : nextPrefixAlias+1]
 			bsc := bs(c)
 			thiz.addPrefixRewrite(attr.Name.Local, bsc)
@@ -180,17 +170,15 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 }
 
 func (thiz *NamespaceModifier) addNamespaceBinding(prefix, namespace []byte) {
-	off := thiz.nsOffs[thiz.top]
+	thiz.nsKeys = append(thiz.nsKeys, prefix)
+	thiz.nsVals = append(thiz.nsVals, namespace)
 	thiz.nsOffs[thiz.top]++
-	thiz.nsKeys[off] = prefix
-	thiz.nsVals[off] = namespace
 }
 
 func (thiz *NamespaceModifier) addPrefixRewrite(original, prefix []byte) {
-	off := thiz.prefixAliasesOffs[thiz.top]
+	thiz.prefixAliasesKeys = append(thiz.prefixAliasesKeys, original)
+	thiz.prefixAliasesVals = append(thiz.prefixAliasesVals, prefix)
 	thiz.prefixAliasesOffs[thiz.top]++
-	thiz.prefixAliasesKeys[off] = original
-	thiz.prefixAliasesVals[off] = prefix
 }
 
 func (thiz NamespaceModifier) NamespaceOfToken(t *Token) []byte {
