@@ -72,6 +72,35 @@ func TestNamespaceAlias1Level(t *testing.T) {
 		"</a:a>", bb.String())
 }
 
+func BenchmarkSameNamespaceSideBySide(b *testing.B) {
+	r := strings.NewReader(
+		"<ns:a xmlns:ns=\"https://mynamespace\">" +
+			"<ns:b/>" +
+			"</ns:a>" +
+			"<ns1:a xmlns:ns1=\"https://mynamespace\">" +
+			"<ns1:b/>" +
+			"</ns:a>")
+	dec := NewDecoder(r)
+	enc := NewEncoder(io.Discard, NewNamespaceModifier())
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, io.SeekStart)
+		dec.Reset(r)
+		for {
+			tk, err := dec.NextToken()
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				panic(err)
+			}
+			err = enc.EncodeToken(tk)
+		}
+	}
+}
+
 func TestSameNamespaceSideBySide(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}

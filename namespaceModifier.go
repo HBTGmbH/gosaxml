@@ -2,39 +2,33 @@ package gosaxml
 
 import "bytes"
 
-// frame is created for each start XML element and contains
-// the potential namespaces and prefixes created for that element
-type frame struct {
-	ns            map[string][]byte
-	prefixAliases map[string][]byte
-	newPrefixes   int
-	openName      Name
-}
-
 type NamespaceModifier struct {
-	// the frames (defining namespaces and prefix rewrites)
-	frames []frame
+	nsKeys [][]byte
+	nsVals [][]byte
+	nsOffs []int
+	nsTop  int
 
-	// pointer to the current active frame
-	f *frame
+	prefixAliasesKeys [][]byte
+	prefixAliasesVals [][]byte
+	prefixAliasesOffs []int
+	prefixAliasesTop  int
 
-	// the next free/available prefix alias
-	nextPrefix int
+	openNames []Name
 
-	// the current "cursor" into the frames slice
 	top int
-}
-
-// Reset resets a Frame
-func (thiz *frame) Reset() {
-	thiz.newPrefixes = 0
-	thiz.ns = nil
-	thiz.prefixAliases = nil
 }
 
 func NewNamespaceModifier() *NamespaceModifier {
 	return &NamespaceModifier{
-		frames: make([]frame, 32),
+		nsKeys: make([][]byte, 32),
+		nsVals: make([][]byte, 32),
+		nsOffs: make([]int, 32),
+
+		prefixAliasesKeys: make([][]byte, 32),
+		prefixAliasesVals: make([][]byte, 32),
+		prefixAliasesOffs: make([]int, 32),
+
+		openNames: make([]Name, 32),
 	}
 }
 
@@ -47,7 +41,7 @@ func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
 		thiz.pushFrame()
 		thiz.processNamespaces(t)
 		thiz.processElementName(t)
-		thiz.f.openName = t.Name
+		thiz.openNames[thiz.top] = t.Name
 	} else if t.Kind == TokenTypeEndElement {
 		thiz.processElementName(t)
 		thiz.popFrame()
@@ -63,7 +57,7 @@ func (thiz *NamespaceModifier) processElementName(t *Token) {
 			t.Name.Prefix = prefix
 		}
 	} else if t.Kind == TokenTypeEndElement {
-		t.Name = thiz.f.openName
+		t.Name = thiz.openNames[thiz.top]
 	}
 }
 
@@ -72,14 +66,14 @@ func (thiz *NamespaceModifier) processElementName(t *Token) {
 // This is the reverse operation of findPrefixForNamespace.
 func (thiz *NamespaceModifier) findNamespaceForPrefix(prefix []byte) []byte {
 	// scan all frames up to the top
-	for t := thiz.top - 1; t >= 0; t-- {
-		f := thiz.frames[t]
-		if f.ns == nil {
-			continue
-		}
-		ns := f.ns[string(prefix)]
-		if ns != nil {
-			return ns
+	for t := thiz.top; t > 0; t-- {
+		i := thiz.nsOffs[t-1]
+		j := thiz.nsOffs[t]
+		for k := j - 1; k >= i; k-- {
+			nsKey := thiz.nsKeys[k]
+			if bytes.Equal(nsKey, prefix) {
+				return thiz.nsVals[k]
+			}
 		}
 	}
 	return nil
@@ -88,17 +82,14 @@ func (thiz *NamespaceModifier) findNamespaceForPrefix(prefix []byte) []byte {
 // findPrefixForNamespace finds the prefix which binds the given namespace (if any)
 // This is the reverse operation of findNamespaceForPrefix.
 func (thiz *NamespaceModifier) findPrefixForNamespace(namespace []byte) []byte {
-	if thiz.top <= 0 {
-		return nil
-	}
-	for t := thiz.top - 1; t >= 0; t-- {
-		f := thiz.frames[t]
-		if f.ns == nil {
-			continue
-		}
-		for k, v := range f.ns {
-			if bytes.Equal(v, namespace) {
-				return bs(k)
+	// scan all frames up to the top
+	for t := thiz.top; t > 0; t-- {
+		i := thiz.nsOffs[t-1]
+		j := thiz.nsOffs[t]
+		for k := j - 1; k >= i; k-- {
+			nsVal := thiz.nsVals[k]
+			if bytes.Equal(nsVal, namespace) {
+				return thiz.nsKeys[k]
 			}
 		}
 	}
@@ -109,44 +100,34 @@ func (thiz *NamespaceModifier) findPrefixForNamespace(namespace []byte) []byte {
 // There is an alias for a given prefix it, during encoding, the prefix
 // has been replaced with a (possibly) shorter alternative.
 func (thiz *NamespaceModifier) findPrefixAlias(prefix []byte) []byte {
-	if thiz.top <= 0 {
-		return nil
-	}
-	for t := thiz.top - 1; t >= 0; t-- {
-		f := thiz.frames[t]
-		if f.prefixAliases == nil {
-			continue
-		}
-		v := f.prefixAliases[string(prefix)]
-		if v != nil {
-			return v
+	// scan all frames up to the top
+	for t := thiz.top; t > 0; t-- {
+		i := thiz.prefixAliasesOffs[t-1]
+		j := thiz.prefixAliasesOffs[t]
+		for k := j - 1; k >= i; k-- {
+			prefixAliasesKey := thiz.prefixAliasesKeys[k]
+			if bytes.Equal(prefixAliasesKey, prefix) {
+				return thiz.prefixAliasesVals[k]
+			}
 		}
 	}
 	return nil
 }
 
 func (thiz *NamespaceModifier) pushFrame() {
-	thiz.frames[thiz.top].Reset()
-	thiz.f = &thiz.frames[thiz.top]
 	thiz.top++
+	thiz.nsOffs[thiz.top] = thiz.nsOffs[thiz.top-1]
+	thiz.prefixAliasesOffs[thiz.top] = thiz.prefixAliasesOffs[thiz.top-1]
 }
 
 func (thiz *NamespaceModifier) popFrame() {
 	thiz.top--
-	thiz.nextPrefix -= thiz.frames[thiz.top].newPrefixes
-	if thiz.top > 0 {
-		thiz.f = &thiz.frames[thiz.top-1]
-	} else {
-		thiz.f = nil
-	}
 }
 
 // processNamespaces scans the attributes of the given token for namespace declarations,
 // either with or without a binding prefix and possibly re-assigns prefixes to other existing
 // or new aliases and drops redundant namespace declarations.
 func (thiz *NamespaceModifier) processNamespaces(t *Token) {
-	var ns map[string][]byte
-	var prefixRewrites map[string][]byte
 	var newAttributes []Attr
 	for _, attr := range t.Attr {
 		// check for advertized namespaces in attributes
@@ -158,18 +139,18 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 				if !bytes.Equal(prefix, attr.Name.Local) {
 					// we don't know that particular prefix but we know that namespace
 					// by another prefix, so establish a rewrite for the prefix
-					addPrefixRewrite(&prefixRewrites, attr.Name.Local, prefix)
+					thiz.addPrefixRewrite(attr.Name.Local, prefix)
 				}
 				// we don't need the attribute anymore because we already had a prefix
 				continue
 			}
 			// wo don't know the prefix, but we want to rewrite it
-			c := namespaceAliases[thiz.nextPrefix : thiz.nextPrefix+1]
-			thiz.f.newPrefixes++
-			thiz.nextPrefix++
-			addPrefixRewrite(&prefixRewrites, attr.Name.Local, bs(c))
-			addNamespaceBinding(&ns, bs(c), attr.Value)
-			attr.Name.Local = bs(c)
+			nextPrefixAlias := thiz.prefixAliasesOffs[thiz.top]
+			c := namespaceAliases[nextPrefixAlias : nextPrefixAlias+1]
+			bsc := bs(c)
+			thiz.addPrefixRewrite(attr.Name.Local, bsc)
+			thiz.addNamespaceBinding(bsc, attr.Value)
+			attr.Name.Local = bsc
 		} else if attr.Name.Prefix == nil && bytes.Equal(attr.Name.Local, bs("xmlns")) {
 			// check if the element is already in that namespace, in which case
 			// we can simply omit the namespace.
@@ -183,35 +164,31 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 			if prefix != nil {
 				// add prefix rewrite for "" -> prefix in order to remember
 				// that any elements without a prefix get the new prefix now
-				addPrefixRewrite(&prefixRewrites, nil, prefix)
+				thiz.addPrefixRewrite(nil, prefix)
 				t.Name.Prefix = prefix
 				continue
 			}
 			// this element uses a new namespace in which all
 			// unprefixed child elements will reside
-			addNamespaceBinding(&ns, nil, attr.Value)
+			thiz.addNamespaceBinding(nil, attr.Value)
 		}
 		newAttributes = append(newAttributes, attr)
 	}
 	t.Attr = newAttributes
-
-	// store established new namespaces and prefix rewrites
-	thiz.f.ns = ns
-	thiz.f.prefixAliases = prefixRewrites
 }
 
-func addNamespaceBinding(ns *map[string][]byte, prefix, namespace []byte) {
-	if *ns == nil {
-		*ns = make(map[string][]byte)
-	}
-	(*ns)[string(prefix)] = namespace
+func (thiz *NamespaceModifier) addNamespaceBinding(prefix, namespace []byte) {
+	off := thiz.nsOffs[thiz.top]
+	thiz.nsOffs[thiz.top]++
+	thiz.nsKeys[off] = prefix
+	thiz.nsVals[off] = namespace
 }
 
-func addPrefixRewrite(prefixRewrites *map[string][]byte, original, prefix []byte) {
-	if *prefixRewrites == nil {
-		*prefixRewrites = make(map[string][]byte)
-	}
-	(*prefixRewrites)[string(original)] = prefix
+func (thiz *NamespaceModifier) addPrefixRewrite(original, prefix []byte) {
+	off := thiz.prefixAliasesOffs[thiz.top]
+	thiz.prefixAliasesOffs[thiz.top]++
+	thiz.prefixAliasesKeys[off] = original
+	thiz.prefixAliasesVals[off] = prefix
 }
 
 func (thiz NamespaceModifier) NamespaceOfToken(t *Token) []byte {
