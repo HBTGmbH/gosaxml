@@ -14,7 +14,7 @@ go get -u github.com/HBTGmbH/gosaxml
 # Features 
 
 * zero-allocation stream decoding of XML inputs (from `io.Reader`)
-* low-allocation stream encoding of XML elements (to `io.Writer`)
+* zero-allocation stream encoding of XML elements (to `io.Writer`)
 * tidying of XML namespace declarations of the encoder input
 
 # Simple examples

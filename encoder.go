@@ -164,7 +164,7 @@ func (thiz *Encoder) encodeEndElement(t Token) error {
 func (thiz *Encoder) callMiddlewares(t *Token) error {
 	var err error
 	for _, middleware := range thiz.middlewares {
-		err = middleware.EncodeToken(t)
+		err = middleware.EncodeToken((*Token)(noescape(unsafe.Pointer(t))))
 		if err != nil {
 			return err
 		}
@@ -250,4 +250,11 @@ func bs(s string) []byte {
 	return (*[0x7fff0000]byte)(unsafe.Pointer(
 		(*reflect.StringHeader)(unsafe.Pointer(&s)).Data),
 	)[:len(s):len(s)]
+}
+
+// https://go.googlesource.com/go/+/go1.17.6/src/runtime/stubs.go#164
+//go:nosplit
+func noescape(p unsafe.Pointer) unsafe.Pointer {
+	x := uintptr(p)
+	return unsafe.Pointer(x ^ 0)
 }
