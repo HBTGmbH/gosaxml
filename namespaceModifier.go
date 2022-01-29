@@ -120,7 +120,7 @@ func (thiz *NamespaceModifier) popFrame() {
 func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 	j := 0
 	for i := 0; i < len(t.Attr); i++ {
-		attr := t.Attr[i]
+		attr := &t.Attr[i]
 		// check for advertized namespaces in attributes
 		if bytes.Equal(attr.Name.Prefix, bs("xmlns")) { // <- xmlns:prefix
 			// this element introduces a new namespace that binds to a prefix
@@ -163,7 +163,9 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 			// unprefixed child elements will reside
 			thiz.addNamespaceBinding(nil, attr.Value)
 		}
-		t.Attr[j] = attr
+		if i > j {
+			t.Attr[j] = *attr
+		}
 		j++
 	}
 	t.Attr = t.Attr[:j]

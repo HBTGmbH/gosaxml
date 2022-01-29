@@ -40,6 +40,7 @@ func NewDecoder(r io.Reader) Decoder {
 func (thiz *decoder) Reset(r io.Reader) {
 	thiz.r.Reset(r)
 	thiz.attrs = thiz.attrs[:0]
+	thiz.bb = thiz.bb[:0]
 	thiz.top = 0
 }
 
@@ -305,11 +306,12 @@ func (thiz *decoder) readAttributes() ([]Attr, error) {
 			if err != nil {
 				return nil, err
 			}
-			attribute, err := thiz.readAttribute()
+			i := len(thiz.attrs)
+			thiz.attrs = thiz.attrs[:i+1]
+			err := thiz.readAttribute(&thiz.attrs[i])
 			if err != nil {
 				return nil, err
 			}
-			thiz.attrs = append(thiz.attrs, attribute)
 			thiz.numAttributes[thiz.top]++
 		}
 	}
@@ -319,35 +321,34 @@ func (thiz *decoder) readAttributes() ([]Attr, error) {
 // after this function returns, the next reader symbol
 // is the byte after the closing single or double quote
 // of the attribute's value.
-func (thiz *decoder) readAttribute() (Attr, error) {
+func (thiz *decoder) readAttribute(attr *Attr) error {
 	name, err := thiz.readName()
 	if err != nil {
-		return Attr{}, err
+		return err
 	}
 	err = thiz.skipWhitespaces()
 	if err != nil {
-		return Attr{}, err
+		return err
 	}
 	b, err := thiz.r.ReadByte()
 	if err != nil {
-		return Attr{}, err
+		return err
 	}
 	if b != '=' {
-		return Attr{}, fmt.Errorf("expected '=' character following attribute %+v", name)
+		return fmt.Errorf("expected '=' character following attribute %+v", name)
 	}
 	err = thiz.skipWhitespaces()
 	if err != nil {
-		return Attr{}, err
+		return err
 	}
 	value, singleQuote, err := thiz.readString()
 	if err != nil {
-		return Attr{}, err
+		return err
 	}
-	return Attr{
-		Name:        name,
-		SingleQuote: singleQuote,
-		Value:       value,
-	}, nil
+	attr.Name = name
+	attr.SingleQuote = singleQuote
+	attr.Value = value
+	return nil
 }
 
 // readString parses a single string (in single or double quotes)
