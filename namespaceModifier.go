@@ -128,8 +128,9 @@ func (thiz *NamespaceModifier) popFrame() {
 // either with or without a binding prefix and possibly re-assigns prefixes to other existing
 // or new aliases and drops redundant namespace declarations.
 func (thiz *NamespaceModifier) processNamespaces(t *Token) {
-	var newAttributes []Attr
-	for _, attr := range t.Attr {
+	j := 0
+	for i := 0; i < len(t.Attr); i++ {
+		attr := t.Attr[i]
 		// check for advertized namespaces in attributes
 		if bytes.Equal(attr.Name.Prefix, bs("xmlns")) { // <- xmlns:prefix
 			// this element introduces a new namespace that binds to a prefix
@@ -172,9 +173,10 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 			// unprefixed child elements will reside
 			thiz.addNamespaceBinding(nil, attr.Value)
 		}
-		newAttributes = append(newAttributes, attr)
+		t.Attr[j] = attr
+		j++
 	}
-	t.Attr = newAttributes
+	t.Attr = t.Attr[:j]
 }
 
 func (thiz *NamespaceModifier) addNamespaceBinding(prefix, namespace []byte) {

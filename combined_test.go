@@ -148,39 +148,76 @@ func TestElementsAndAttributes(t *testing.T) {
 	bb := &bytes.Buffer{}
 	dec := NewDecoder(strings.NewReader(
 		"<bookstore>" +
-			"<book category=\"children\">" +
-			"<title>Harry Potter</title>" +
+			"<book category=\"children\" xmlns=\"http://mydomain.org\">" +
+			"<title kind=\"title\" xmlns=\"http://mydomain.org\">Harry Potter</title>" +
 			"<author>J K. Rowling</author>" +
 			"<year>2005</year>" +
 			"<price>29.99</price>" +
 			"</book>" +
-			"<book category=\"web\">" +
-			"<title>Learning XML</title>" +
+			"<book category=\"web\" xmlns=\"http://mydomain.org\">" +
+			"<title kind=\"title\" xmlns=\"http://mydomain.org\">Learning XML</title>" +
 			"<author>Erik T. Ray</author>" +
 			"<year>2003</year>" +
 			"<price>39.95</price>" +
 			"</book>" +
 			"</bookstore>"))
-	enc := NewEncoder(bb)
+	enc := NewEncoder(bb, NewNamespaceModifier())
 
 	// when
 	decodeEncode(t, dec, enc)
 
 	// then
 	assert.Equal(t, "<bookstore>"+
-		"<book category=\"children\">"+
-		"<title>Harry Potter</title>"+
+		"<book category=\"children\" xmlns=\"http://mydomain.org\">"+
+		"<title kind=\"title\">Harry Potter</title>"+
 		"<author>J K. Rowling</author>"+
 		"<year>2005</year>"+
 		"<price>29.99</price>"+
 		"</book>"+
-		"<book category=\"web\">"+
-		"<title>Learning XML</title>"+
+		"<book category=\"web\" xmlns=\"http://mydomain.org\">"+
+		"<title kind=\"title\">Learning XML</title>"+
 		"<author>Erik T. Ray</author>"+
 		"<year>2003</year>"+
 		"<price>39.95</price>"+
 		"</book>"+
 		"</bookstore>", bb.String())
+}
+
+func BenchmarkElementsAndAttributes(b *testing.B) {
+	r := strings.NewReader(
+		"<bookstore>" +
+			"<book category=\"children\" xmlns=\"http://mydomain.org\">" +
+			"<title kind=\"title\" xmlns=\"http://mydomain.org\">Harry Potter</title>" +
+			"<author>J K. Rowling</author>" +
+			"<year>2005</year>" +
+			"<price>29.99</price>" +
+			"</book>" +
+			"<book category=\"web\" xmlns=\"http://mydomain.org\">" +
+			"<title kind=\"title\" xmlns=\"http://mydomain.org\">Learning XML</title>" +
+			"<author>Erik T. Ray</author>" +
+			"<year>2003</year>" +
+			"<price>39.95</price>" +
+			"</book>" +
+			"</bookstore>")
+	dec := NewDecoder(r)
+	enc := NewEncoder(io.Discard, NewNamespaceModifier())
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, io.SeekStart)
+		dec.Reset(r)
+		for {
+			tk, err := dec.NextToken()
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				panic(err)
+			}
+			_ = enc.EncodeToken(tk)
+		}
+	}
 }
 
 func decodeEncode(t *testing.T, dec Decoder, enc *Encoder) {
