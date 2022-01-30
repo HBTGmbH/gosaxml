@@ -37,6 +37,10 @@ func NewNamespaceModifier() *NamespaceModifier {
 // Reset resets this NamespaceModifier.
 func (thiz *NamespaceModifier) Reset() {
 	thiz.top = 0
+	thiz.nsKeys = thiz.nsKeys[:0]
+	thiz.nsVals = thiz.nsVals[:0]
+	thiz.prefixAliasesKeys = thiz.prefixAliasesKeys[:0]
+	thiz.prefixAliasesVals = thiz.prefixAliasesVals[:0]
 }
 
 func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
