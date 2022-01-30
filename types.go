@@ -8,7 +8,7 @@ type Name struct {
 }
 
 // Attr is an attribute of an element.
-// Only elements of type TokenTypeStartElement can have attributes.
+// Only tokens of type TokenTypeStartElement can have attributes.
 type Attr struct {
 	Name        Name
 	SingleQuote bool
@@ -26,7 +26,7 @@ const (
 )
 
 // Token represents the union of all possible token types
-// and their respective information.
+// with their respective information.
 type Token struct {
 	Kind byte
 

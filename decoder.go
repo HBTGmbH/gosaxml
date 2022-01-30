@@ -11,6 +11,10 @@ import (
 type Decoder interface {
 	// NextToken decodes and stores the next Token into
 	// the provided Token pointer.
+	// Only the fields relevant for the decoded token type
+	// are written to the Token. Other fields may have previous
+	// values. The caller should thus determine the Token.Kind
+	// and then only read/touch the fields relevant for that kind.
 	NextToken(t *Token) error
 
 	// Reset resets the Decoder to the given io.Reader.
@@ -76,7 +80,7 @@ func (thiz *decoder) NextToken(t *Token) error {
 		}
 		switch b {
 		case '>':
-			// Previously StartElement now got properly ended.
+			// Previous StartElement now got properly ended.
 			// That's fine. We just did not consume the end token
 			// because there could have been an implicit
 			// "/>" close at the end of the start element.

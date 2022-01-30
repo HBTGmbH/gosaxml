@@ -15,24 +15,32 @@ const (
 // EncoderMiddleware allows to pre-process a Token before
 // it is finally encoded/written.
 type EncoderMiddleware interface {
+	// EncodeToken will be called by the Encoder before the provided Token
+	// is finally byte-encoded into the io.Writer.
 	EncodeToken(token *Token) error
+
+	// Reset resets the state of an EncoderMiddleware.
+	// This can be used to e.g. reset all pre-allocated data structures
+	// and reinitialize the EncoderMiddleware to the state before the
+	// any first call to EncodeToken.
 	Reset()
 }
 
+// Encoder encodes Token values to an io.Writer.
 type Encoder struct {
-	// the io.Writer we encode/write into
+	// The io.Writer we encode/write into.
 	w io.Writer
 
-	// whether the last token was of type TokenTypeStartElement
-	// this is used to delay encoding the ending ">" or "/>" string
+	// Whether the last token was of type TokenTypeStartElement.
+	// This is used to delay encoding the ending ">" or "/>" string
 	// based on whether the element is immediately closed afterwards.
 	lastStartElement bool
 
-	// middlewares can modify encoded tokens before encoding
+	// middlewares can modify encoded tokens before encoding.
 	middlewares []EncoderMiddleware
 }
 
-// NewEncoder creates a new encoder with the given middlewares.
+// NewEncoder creates a new Encoder with the given middlewares and returns a pointer to it.
 func NewEncoder(w io.Writer, middlewares ...EncoderMiddleware) *Encoder {
 	return &Encoder{
 		w:           w,
@@ -40,6 +48,8 @@ func NewEncoder(w io.Writer, middlewares ...EncoderMiddleware) *Encoder {
 	}
 }
 
+// Reset resets this Encoder to write into the provided io.Writer
+// and resets all middlewares.
 func (thiz *Encoder) Reset(w io.Writer) {
 	thiz.w = w
 	thiz.lastStartElement = false
@@ -48,6 +58,9 @@ func (thiz *Encoder) Reset(w io.Writer) {
 	}
 }
 
+// EncodeToken first calls any EncoderMiddleware and then
+// writes the byte-representation of that Token to the io.Writer
+// of this Encoder.
 func (thiz *Encoder) EncodeToken(t *Token) error {
 	switch t.Kind {
 	case TokenTypeStartElement:
@@ -108,12 +121,10 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 		if err != nil {
 			return err
 		}
-		// attribute name
 		err = thiz.writeName(attr.Name)
 		if err != nil {
 			return err
 		}
-		// attribute value
 		_, err = thiz.w.Write(bs("="))
 		if err != nil {
 			return err
@@ -126,6 +137,7 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 
 	// DO NOT write the ending ">" character, because the element
 	// could get closed right away with the next EndElement token.
+
 	return nil
 }
 
@@ -133,7 +145,6 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if thiz.lastStartElement {
 		// the last seen token was a StartElement, so this
 		// token can only be its accompanying EndElement.
-		// short-cut it.
 		_, err := thiz.w.Write(bs("/>"))
 		if err != nil {
 			return err
@@ -149,7 +160,6 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	// write element name
 	err = thiz.writeName(t.Name)
 	if err != nil {
 		return err

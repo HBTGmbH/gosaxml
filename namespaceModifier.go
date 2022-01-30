@@ -2,6 +2,9 @@ package gosaxml
 
 import "bytes"
 
+// NamespaceModifier can be used to obtain information about the
+// effective namespace of a decoded Token via NamespaceOfToken
+// and to canonicalize/minify namespace declarations.
 type NamespaceModifier struct {
 	nsKeys [][]byte
 	nsVals [][]byte
@@ -16,6 +19,7 @@ type NamespaceModifier struct {
 	top int
 }
 
+// NewNamespaceModifier creates a new NamespaceModifier and returns a pointer to it.
 func NewNamespaceModifier() *NamespaceModifier {
 	return &NamespaceModifier{
 		nsKeys: make([][]byte, 0, 32),
@@ -30,6 +34,7 @@ func NewNamespaceModifier() *NamespaceModifier {
 	}
 }
 
+// Reset resets this NamespaceModifier.
 func (thiz *NamespaceModifier) Reset() {
 	thiz.top = 0
 }
@@ -182,6 +187,9 @@ func (thiz *NamespaceModifier) addPrefixRewrite(original, prefix []byte) {
 	thiz.prefixAliasesOffs[thiz.top]++
 }
 
+// NamespaceOfToken returns the decoded effective namespace (as byte slice)
+// of the provided Token. The byte slice will be from a pre-allocated pool
+// in the Encoder and must not be accessed once the Token got out of scope in the Encoder.
 func (thiz NamespaceModifier) NamespaceOfToken(t *Token) []byte {
 	prefix := t.Name.Prefix
 	if len(prefix) > 0 {

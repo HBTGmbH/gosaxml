@@ -35,14 +35,15 @@ func TestDecodeAndEncode(t *testing.T) {
 	enc := gosaxml.NewEncoder(&w)
 
 	// when
+	var tk Token
 	for {
-		tk, err := dec.NextToken()
+		err := dec.NextToken(&tk)
 		if err == io.EOF {
 			break
 		}
 		assert.Nil(t, err)
 
-		err = enc.EncodeToken(tk)
+		err = enc.EncodeToken(&tk)
 		assert.Nil(t, err)
 	}
 
