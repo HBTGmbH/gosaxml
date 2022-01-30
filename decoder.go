@@ -399,7 +399,6 @@ func (thiz *decoder) readString() ([]byte, bool, error) {
 		return nil, false, err
 	}
 	i := len(thiz.bb)
-	j := i
 	singleQuote := b == '\''
 	for {
 		b, err := thiz.r.ReadByte()
@@ -412,22 +411,16 @@ func (thiz *decoder) readString() ([]byte, bool, error) {
 				if err != nil {
 					return nil, false, err
 				}
-				return thiz.bb[i:j], singleQuote, nil
+				return thiz.bb[i:len(thiz.bb)], singleQuote, nil
 			}
-			thiz.bb = append(thiz.bb, b)
-			j++
 		case '\'':
 			if singleQuote {
 				if err != nil {
 					return nil, false, err
 				}
-				return thiz.bb[i:j], singleQuote, nil
+				return thiz.bb[i:len(thiz.bb)], singleQuote, nil
 			}
-			thiz.bb = append(thiz.bb, b)
-			j++
-		default:
-			thiz.bb = append(thiz.bb, b)
-			j++
 		}
+		thiz.bb = append(thiz.bb, b)
 	}
 }
