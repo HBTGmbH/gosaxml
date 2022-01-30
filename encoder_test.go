@@ -1,7 +1,8 @@
-package gosaxml
+package gosaxml_test
 
 import (
 	"bytes"
+	"github.com/HBTGmbH/gosaxml"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"testing"
@@ -9,18 +10,18 @@ import (
 
 func BenchmarkEncodeStartTokenWithNamespaceModifier(b *testing.B) {
 	w := ioutil.Discard
-	enc := NewEncoder(w, NewNamespaceModifier())
-	token := Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local:  bs("a"),
-			Prefix: bs("b"),
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
+	token := gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local:  []byte("a"),
+			Prefix: []byte("b"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local: []byte("xmlns"),
 			},
-			Value: bs("https://my.org"),
+			Value: []byte("https://my.org"),
 		}},
 	}
 
@@ -35,26 +36,26 @@ func BenchmarkEncodeStartTokenWithNamespaceModifier(b *testing.B) {
 
 func BenchmarkEncode(b *testing.B) {
 	w := ioutil.Discard
-	enc := NewEncoder(w)
-	token0 := Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local:  bs("a"),
-			Prefix: bs("b"),
+	enc := gosaxml.NewEncoder(w)
+	token0 := gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local:  []byte("a"),
+			Prefix: []byte("b"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local:  bs("b"),
-				Prefix: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local:  []byte("b"),
+				Prefix: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	}
-	token1 := Token{
-		Kind: TokenTypeEndElement,
-		Name: Name{
-			Local:  bs("a"),
-			Prefix: bs("b"),
+	token1 := gosaxml.Token{
+		Kind: gosaxml.TokenTypeEndElement,
+		Name: gosaxml.Name{
+			Local:  []byte("a"),
+			Prefix: []byte("b"),
 		},
 	}
 
@@ -73,21 +74,21 @@ func BenchmarkEncode(b *testing.B) {
 func TestEncodeStartElement(t *testing.T) {
 	// given
 	w := &bytes.Buffer{}
-	enc := NewEncoder(w, NewNamespaceModifier())
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
 
 	// when
-	err := enc.EncodeToken(&Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local:  bs("a"),
-			Prefix: bs("b"),
+	err := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local:  []byte("a"),
+			Prefix: []byte("b"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local:  bs("b"),
-				Prefix: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local:  []byte("b"),
+				Prefix: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
 
@@ -99,61 +100,61 @@ func TestEncodeStartElement(t *testing.T) {
 func TestEncodeStartElementEndElement(t *testing.T) {
 	// given
 	w := &bytes.Buffer{}
-	enc := NewEncoder(w, NewNamespaceModifier())
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
 
 	// when
-	err1 := enc.EncodeToken(&Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Prefix: bs("c"),
-			Local:  bs("a"),
+	err1 := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Prefix: []byte("c"),
+			Local:  []byte("a"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Prefix: bs("xmlns"),
-				Local:  bs("c"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Prefix: []byte("xmlns"),
+				Local:  []byte("c"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
-	err2 := enc.EncodeToken(&Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local: bs("b"),
+	err2 := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local: []byte("b"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
-	err3 := enc.EncodeToken(&Token{
-		Kind:     TokenTypeTextElement,
-		ByteData: bs("Hello"),
+	err3 := enc.EncodeToken(&gosaxml.Token{
+		Kind:     gosaxml.TokenTypeTextElement,
+		ByteData: []byte("Hello"),
 	})
-	err4 := enc.EncodeToken(&Token{
-		Kind: TokenTypeEndElement,
-		Name: Name{
-			Local: bs("b"),
+	err4 := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeEndElement,
+		Name: gosaxml.Name{
+			Local: []byte("b"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
-	err5 := enc.EncodeToken(&Token{
-		Kind: TokenTypeEndElement,
-		Name: Name{
-			Local: bs("a"),
+	err5 := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeEndElement,
+		Name: gosaxml.Name{
+			Local: []byte("a"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
 
@@ -169,33 +170,33 @@ func TestEncodeStartElementEndElement(t *testing.T) {
 func TestEncodeTwoNestedWithRedundantNamespace(t *testing.T) {
 	// given
 	w := &bytes.Buffer{}
-	enc := NewEncoder(w, NewNamespaceModifier())
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
 
 	// when
-	err1 := enc.EncodeToken(&Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local:  bs("a"),
-			Prefix: bs("ns1"),
+	err1 := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local:  []byte("a"),
+			Prefix: []byte("ns1"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local:  bs("ns1"),
-				Prefix: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local:  []byte("ns1"),
+				Prefix: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
-	err2 := enc.EncodeToken(&Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local: bs("b"),
+	err2 := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local: []byte("b"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
 
@@ -208,31 +209,31 @@ func TestEncodeTwoNestedWithRedundantNamespace(t *testing.T) {
 func TestEncodeTwoNestedWithRedundantNamespaceUnprefixed(t *testing.T) {
 	// given
 	w := &bytes.Buffer{}
-	enc := NewEncoder(w, NewNamespaceModifier())
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
 
 	// when
-	err1 := enc.EncodeToken(&Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local: bs("a"),
+	err1 := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local: []byte("a"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
-	err2 := enc.EncodeToken(&Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local: bs("b"),
+	err2 := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local: []byte("b"),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local: []byte("xmlns"),
 			},
-			Value: bs("https://mynamespace"),
+			Value: []byte("https://mynamespace"),
 		}},
 	})
 

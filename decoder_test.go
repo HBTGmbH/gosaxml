@@ -1,7 +1,8 @@
-package gosaxml
+package gosaxml_test
 
 import (
 	"bufio"
+	"github.com/HBTGmbH/gosaxml"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"strings"
@@ -12,8 +13,8 @@ func BenchmarkNextToken(b *testing.B) {
 	// given
 	doc := "<a attr1=\"1\" attr2=\"2\" xmlns=\"https://mydomain.org\"/>"
 	r := strings.NewReader(doc)
-	dec := NewDecoder(r)
-	var tk Token
+	dec := gosaxml.NewDecoder(r)
+	var tk gosaxml.Token
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -30,8 +31,8 @@ func BenchmarkNextToken(b *testing.B) {
 func TestDecodeStartEnd(t *testing.T) {
 	// given
 	doc := "<a></a>"
-	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
-	var t1, t2, t3 Token
+	dec := gosaxml.NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var t1, t2, t3 gosaxml.Token
 
 	// when
 	err1 := dec.NextToken(&t1)
@@ -49,8 +50,8 @@ func TestDecodeStartEnd(t *testing.T) {
 func TestDecodeStartTextEnd(t *testing.T) {
 	// given
 	doc := "<a>Hello, World!</a>"
-	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
-	var tk Token
+	dec := gosaxml.NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var tk gosaxml.Token
 
 	// when
 	err := dec.NextToken(&tk)
@@ -72,8 +73,8 @@ func TestDecodeStartTextEnd(t *testing.T) {
 func TestDecodeStartEndWithPrefix(t *testing.T) {
 	// given
 	doc := "<ns1:a></ns1:a>"
-	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
-	var t1, t2, t3 Token
+	dec := gosaxml.NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var t1, t2, t3 gosaxml.Token
 
 	// when
 	err1 := dec.NextToken(&t1)
@@ -91,8 +92,8 @@ func TestDecodeStartEndWithPrefix(t *testing.T) {
 func TestDecodeStartEndImplicit(t *testing.T) {
 	// given
 	doc := "<a/>"
-	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
-	var t1, t2, t3 Token
+	dec := gosaxml.NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var t1, t2, t3 gosaxml.Token
 
 	// when
 	err1 := dec.NextToken(&t1)
@@ -110,8 +111,8 @@ func TestDecodeStartEndImplicit(t *testing.T) {
 func TestDecodeNested(t *testing.T) {
 	// given
 	doc := "<a attr1=\"foo\"><b attr2=\"bar\"><c attr3=\"baz\"><d attr4=\"blubb\"></d></c></b></a>"
-	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
-	var tk Token
+	dec := gosaxml.NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var tk gosaxml.Token
 
 	// when / then
 	err := dec.NextToken(&tk)
@@ -131,8 +132,8 @@ func TestDecodeNested(t *testing.T) {
 func TestDecodeNested2(t *testing.T) {
 	// given
 	doc := "<a attr1=\"foo\"><b1 attr21=\"bar1\" /><c11 attr311=\"baz11\" /><d111 attr4111=\"blubb111\"></d111></a>"
-	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
-	var tk Token
+	dec := gosaxml.NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var tk gosaxml.Token
 
 	// when / then
 	err := dec.NextToken(&tk)
@@ -161,8 +162,8 @@ func TestDecodeNested2(t *testing.T) {
 func TestIgnoreComments(t *testing.T) {
 	// given
 	doc := "<a><!-- Helo -- --- ---></a>"
-	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
-	var t1, t2, t3 Token
+	dec := gosaxml.NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var t1, t2, t3 gosaxml.Token
 
 	// when
 	err1 := dec.NextToken(&t1)
@@ -177,58 +178,58 @@ func TestIgnoreComments(t *testing.T) {
 	assert.Equal(t, io.EOF, err3)
 }
 
-func assertTextElement(t *testing.T, text string, token Token) {
-	assert.Equal(t, uint8(TokenTypeTextElement), token.Kind)
+func assertTextElement(t *testing.T, text string, token gosaxml.Token) {
+	assert.Equal(t, uint8(gosaxml.TokenTypeTextElement), token.Kind)
 	assert.Equal(t, []byte(text), token.ByteData)
 }
 
-func assertEndElement(t *testing.T, local string, token Token) {
-	assert.Equal(t, uint8(TokenTypeEndElement), token.Kind)
+func assertEndElement(t *testing.T, local string, token gosaxml.Token) {
+	assert.Equal(t, uint8(gosaxml.TokenTypeEndElement), token.Kind)
 	assert.Equal(t, []byte(local), token.Name.Local)
 }
 
-func startElement(local string) Token {
-	return Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
+func startElement(local string) gosaxml.Token {
+	return gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
 			Local: []byte(local),
 		},
-		Attr: []Attr{},
+		Attr: []gosaxml.Attr{},
 	}
 }
 
-func startElementWithPrefix(prefix, local string) Token {
-	return Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
+func startElementWithPrefix(prefix, local string) gosaxml.Token {
+	return gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
 			Prefix: []byte(prefix),
 			Local:  []byte(local),
 		},
-		Attr: []Attr{},
+		Attr: []gosaxml.Attr{},
 	}
 }
 
-func startElementWithAttr(local string, attrName string, attrValue string) Token {
-	return Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
+func startElementWithAttr(local string, attrName string, attrValue string) gosaxml.Token {
+	return gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
 			Local: []byte(local),
 		},
-		Attr: []Attr{
+		Attr: []gosaxml.Attr{
 			{
-				Name: Name{
-					Local: bs(attrName),
+				Name: gosaxml.Name{
+					Local: []byte(attrName),
 				},
-				Value: bs(attrValue),
+				Value: []byte(attrValue),
 			},
 		},
 	}
 }
 
-func endElementWithPrefix(prefix, local string) Token {
-	return Token{
-		Kind: TokenTypeEndElement,
-		Name: Name{
+func endElementWithPrefix(prefix, local string) gosaxml.Token {
+	return gosaxml.Token{
+		Kind: gosaxml.TokenTypeEndElement,
+		Name: gosaxml.Name{
 			Prefix: []byte(prefix),
 			Local:  []byte(local),
 		},

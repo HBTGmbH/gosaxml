@@ -1,7 +1,8 @@
-package gosaxml
+package gosaxml_test
 
 import (
 	"bytes"
+	"github.com/HBTGmbH/gosaxml"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"strings"
@@ -20,11 +21,11 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
   </m:GetPrice>
 </soap:Body>
 </soap:Envelope>`
-	dec := NewDecoder(strings.NewReader(input))
+	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	w := &bytes.Buffer{}
-	nm := NewNamespaceModifier()
-	enc := NewEncoder(w, nm)
-	var tk Token
+	nm := gosaxml.NewNamespaceModifier()
+	enc := gosaxml.NewEncoder(w, nm)
+	var tk gosaxml.Token
 
 	// when
 	for {
@@ -39,14 +40,14 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
 
 		// check if this is "https://www.w3schools.com/prices":GetPrice
 		pricesNamespace := "https://www.w3schools.com/prices"
-		if tk.Kind == TokenTypeStartElement &&
-			bytes.Equal(tk.Name.Local, bs("GetPrice")) &&
-			bytes.Equal(nm.NamespaceOfToken(&tk), bs(pricesNamespace)) {
+		if tk.Kind == gosaxml.TokenTypeStartElement &&
+			bytes.Equal(tk.Name.Local, []byte("GetPrice")) &&
+			bytes.Equal(nm.NamespaceOfToken(&tk), []byte(pricesNamespace)) {
 
 			// inject '\n    <m:Item>Apples</m:Item>' here.
 			// We do not know the concrete prefix to use, but we _do_ know the namespace
 			// that we want the new element to reside in (this is usually known in advance).
-			// So, we can add a Token of kind TokenTypeStartElement with an "xmlns" attribute
+			// So, we can add a gosaxml.Token of kind gosaxml.TokenTypeStartElement with an "xmlns" attribute
 			// which the NamespaceModifier will then translate to the already known prefix
 			// for that namespace.
 			addTextToken(t, enc, "\n    ")
@@ -68,33 +69,33 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
 </a:Envelope>`, w.String())
 }
 
-func addEndElement(t *testing.T, enc *Encoder) {
-	err := enc.EncodeToken(&Token{
-		Kind: TokenTypeEndElement,
+func addEndElement(t *testing.T, enc *gosaxml.Encoder) {
+	err := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeEndElement,
 	})
 	assert.Nil(t, err)
 }
 
-func addStartElement(t *testing.T, enc *Encoder, local, namespace string) {
-	err := enc.EncodeToken(&Token{
-		Kind: TokenTypeStartElement,
-		Name: Name{
-			Local: bs(local),
+func addStartElement(t *testing.T, enc *gosaxml.Encoder, local, namespace string) {
+	err := enc.EncodeToken(&gosaxml.Token{
+		Kind: gosaxml.TokenTypeStartElement,
+		Name: gosaxml.Name{
+			Local: []byte(local),
 		},
-		Attr: []Attr{{
-			Name: Name{
-				Local: bs("xmlns"),
+		Attr: []gosaxml.Attr{{
+			Name: gosaxml.Name{
+				Local: []byte("xmlns"),
 			},
-			Value: bs(namespace),
+			Value: []byte(namespace),
 		}},
 	})
 	assert.Nil(t, err)
 }
 
-func addTextToken(t *testing.T, enc *Encoder, text string) {
-	err := enc.EncodeToken(&Token{
-		Kind:     TokenTypeTextElement,
-		ByteData: bs(text),
+func addTextToken(t *testing.T, enc *gosaxml.Encoder, text string) {
+	err := enc.EncodeToken(&gosaxml.Token{
+		Kind:     gosaxml.TokenTypeTextElement,
+		ByteData: []byte(text),
 	})
 	assert.Nil(t, err)
 }

@@ -1,7 +1,8 @@
-package gosaxml
+package gosaxml_test
 
 import (
 	"bytes"
+	"github.com/HBTGmbH/gosaxml"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"strings"
@@ -11,9 +12,9 @@ import (
 func BenchmarkNamespaceAlias1Level(b *testing.B) {
 	input := "<ns:a xmlns:ns=\"https://mynamespace\"/>"
 	r := strings.NewReader(input)
-	dec := NewDecoder(r)
-	enc := NewEncoder(io.Discard, NewNamespaceModifier())
-	var tk Token
+	dec := gosaxml.NewDecoder(r)
+	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -35,14 +36,14 @@ func BenchmarkNamespaceAlias1Level(b *testing.B) {
 func TestNamespacePrefixedAndUnprefixed(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
-	dec := NewDecoder(strings.NewReader(
+	dec := gosaxml.NewDecoder(strings.NewReader(
 		"<ns:a xmlns:ns=\"https://mynamespace\">" +
 			"<b xmlns=\"https://mynamespace\">" +
 			"<c />" +
 			"</b>" +
 			"</ns:a>"))
-	enc := NewEncoder(bb, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(bb, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -58,13 +59,13 @@ func TestNamespacePrefixedAndUnprefixed(t *testing.T) {
 func TestNamespaceAlias1Level(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
-	dec := NewDecoder(strings.NewReader(
+	dec := gosaxml.NewDecoder(strings.NewReader(
 		"<ns:a xmlns:ns=\"https://mynamespace\">" +
 			"<ns1:b xmlns:ns1=\"https://mynamespace\">" +
 			"</ns1:b>" +
 			"</ns:a>"))
-	enc := NewEncoder(bb, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(bb, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -83,9 +84,9 @@ func BenchmarkSameNamespaceSideBySide(b *testing.B) {
 			"<ns1:a xmlns:ns1=\"https://mynamespace\">" +
 			"<ns1:b/>" +
 			"</ns:a>")
-	dec := NewDecoder(r)
-	enc := NewEncoder(io.Discard, NewNamespaceModifier())
-	var tk Token
+	dec := gosaxml.NewDecoder(r)
+	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -108,15 +109,15 @@ func BenchmarkSameNamespaceSideBySide(b *testing.B) {
 func TestSameNamespaceSideBySide(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
-	dec := NewDecoder(strings.NewReader(
+	dec := gosaxml.NewDecoder(strings.NewReader(
 		"<ns:a xmlns:ns=\"https://mynamespace\">" +
 			"<ns:b/>" +
 			"</ns:a>" +
 			"<ns1:a xmlns:ns1=\"https://mynamespace\">" +
 			"<ns1:b/>" +
 			"</ns:a>"))
-	enc := NewEncoder(bb, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(bb, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -133,12 +134,12 @@ func TestSameNamespaceSideBySide(t *testing.T) {
 func TestBeginTextEnd(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
-	dec := NewDecoder(strings.NewReader(
+	dec := gosaxml.NewDecoder(strings.NewReader(
 		"<ns:a xmlns:ns=\"https://mynamespace\">" +
 			"Hello, World!" +
 			"</ns:a>"))
-	enc := NewEncoder(bb, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(bb, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -152,12 +153,12 @@ func TestBeginTextEnd(t *testing.T) {
 func TestAttributeWithSingleQuote(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
-	dec := NewDecoder(strings.NewReader(
+	dec := gosaxml.NewDecoder(strings.NewReader(
 		"<a attr1='https://mynam\"espace'>" +
 			"Hello, World!" +
 			"</a>"))
-	enc := NewEncoder(bb, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(bb, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -171,12 +172,12 @@ func TestAttributeWithSingleQuote(t *testing.T) {
 func TestAttributeWithDoubleQuote(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
-	dec := NewDecoder(strings.NewReader(
+	dec := gosaxml.NewDecoder(strings.NewReader(
 		"<a attr1=\"https://mynam'espace\">" +
 			"Hello, World!" +
 			"</a>"))
-	enc := NewEncoder(bb, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(bb, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -190,7 +191,7 @@ func TestAttributeWithDoubleQuote(t *testing.T) {
 func TestElementsAndAttributes(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
-	dec := NewDecoder(strings.NewReader(
+	dec := gosaxml.NewDecoder(strings.NewReader(
 		"<bookstore>" +
 			"<book category=\"children\" xmlns=\"http://mydomain.org\">" +
 			"<title kind=\"title\" xmlns=\"http://mydomain.org\">Harry Potter</title>" +
@@ -205,8 +206,8 @@ func TestElementsAndAttributes(t *testing.T) {
 			"<price>39.95</price>" +
 			"</book>" +
 			"</bookstore>"))
-	enc := NewEncoder(bb, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(bb, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -244,9 +245,9 @@ func BenchmarkElementsAndAttributes(b *testing.B) {
 			"<price>39.95</price>" +
 			"</book>" +
 			"</bookstore>")
-	dec := NewDecoder(r)
-	enc := NewEncoder(io.Discard, NewNamespaceModifier())
-	var tk Token
+	dec := gosaxml.NewDecoder(r)
+	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -272,10 +273,10 @@ func TestAttributesWithNamespace(t *testing.T) {
 <soap:Envelope
 xmlns:soap="http://www.w3.org/2003/05/soap-envelope/"
 soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding"></soap:Envelope>`
-	dec := NewDecoder(strings.NewReader(input))
+	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	w := &bytes.Buffer{}
-	enc := NewEncoder(w, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -297,10 +298,10 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
   </m:GetPrice>
 </soap:Body>
 </soap:Envelope>`
-	dec := NewDecoder(strings.NewReader(input))
+	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	w := &bytes.Buffer{}
-	enc := NewEncoder(w, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -326,10 +327,10 @@ func TestAttributesWithPrefixes(t *testing.T) {
   </b:c>
 </ns1:b>
 </ns1:a>`
-	dec := NewDecoder(strings.NewReader(input))
+	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	w := &bytes.Buffer{}
-	enc := NewEncoder(w, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -350,10 +351,10 @@ func TestProcInst(t *testing.T) {
 	input := `
 <?xml version="1.0"?>
 <ns1 xmlns:ns1="http://ns1" ns1:attr1="val1"></ns1:a>`
-	dec := NewDecoder(strings.NewReader(input))
+	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	w := &bytes.Buffer{}
-	enc := NewEncoder(w, NewNamespaceModifier())
-	var tk Token
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
 
 	// when
 	decodeEncode(t, dec, enc, &tk)
@@ -364,7 +365,7 @@ func TestProcInst(t *testing.T) {
 <ns1 xmlns:a="http://ns1" a:attr1="val1"/>`, w.String())
 }
 
-func decodeEncode(t *testing.T, dec Decoder, enc *Encoder, tk *Token) {
+func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *gosaxml.Token) {
 	for {
 		err := dec.NextToken(tk)
 		if err == io.EOF {
