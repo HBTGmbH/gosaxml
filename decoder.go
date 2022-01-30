@@ -139,8 +139,41 @@ func (thiz *decoder) NextToken(t *Token) error {
 	}
 }
 
-func (decoder) decodeProcInst(t *Token) error {
-	return errors.New("NYI")
+func (thiz *decoder) decodeProcInst(t *Token) error {
+	name, err := thiz.readName()
+	if err != nil {
+		return err
+	}
+	err = thiz.skipWhitespaces()
+	if err != nil {
+		return err
+	}
+	i := len(thiz.bb)
+	for {
+		b, err := thiz.r.ReadByte()
+		if err != nil {
+			return err
+		}
+		if b == '?' {
+			for {
+				b2, err := thiz.r.ReadByte()
+				if err != nil {
+					return err
+				}
+				if b2 == '>' {
+					t.Kind = TokenTypeProcInst
+					t.Name = name
+					t.ByteData = thiz.bb[i:len(thiz.bb)]
+					return nil
+				} else if b2 != '?' {
+					thiz.bb = append(thiz.bb, b, b2)
+					break
+				}
+			}
+		} else {
+			thiz.bb = append(thiz.bb, b)
+		}
+	}
 }
 
 func (thiz decoder) ignoreComment() error {
@@ -148,7 +181,6 @@ func (thiz decoder) ignoreComment() error {
 	if err != nil {
 		return err
 	}
-	// read until end of comment
 	for {
 		b, err := thiz.r.ReadByte()
 		if err != nil {

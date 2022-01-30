@@ -87,6 +87,12 @@ func (thiz *Encoder) EncodeToken(t *Token) error {
 			return err
 		}
 		thiz.lastStartElement = false
+	case TokenTypeProcInst:
+		err := thiz.encodeProcInst(t)
+		if err != nil {
+			return err
+		}
+		thiz.lastStartElement = false
 	default:
 		thiz.lastStartElement = false
 		return errors.New("NYI")
@@ -249,6 +255,31 @@ func (thiz *Encoder) encodeDirective(t *Token) error {
 		return err
 	}
 	_, err = thiz.w.Write(t.ByteData)
+	return err
+}
+
+func (thiz *Encoder) encodeProcInst(t *Token) error {
+	err := thiz.endLastStartElement()
+	if err != nil {
+		return err
+	}
+	_, err = thiz.w.Write(bs("<?"))
+	if err != nil {
+		return err
+	}
+	err = thiz.writeName(t.Name)
+	if err != nil {
+		return err
+	}
+	_, err = thiz.w.Write(bs(" "))
+	if err != nil {
+		return err
+	}
+	_, err = thiz.w.Write(t.ByteData)
+	if err != nil {
+		return err
+	}
+	_, err = thiz.w.Write(bs("?>"))
 	return err
 }
 

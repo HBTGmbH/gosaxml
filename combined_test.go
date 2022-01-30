@@ -247,6 +247,85 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding"></soap:Envelope>`
 <a:Envelope xmlns:a="http://www.w3.org/2003/05/soap-envelope/" a:encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>`, w.String())
 }
 
+func TestSOAP(t *testing.T) {
+	// given
+	input := `
+<soap:Envelope
+xmlns:soap="http://www.w3.org/2003/05/soap-envelope/"
+soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
+<soap:Body>
+  <m:GetPrice xmlns:m="https://www.w3schools.com/prices">
+    <m:Item>Apples</m:Item>
+  </m:GetPrice>
+</soap:Body>
+</soap:Envelope>`
+	dec := NewDecoder(strings.NewReader(input))
+	w := &bytes.Buffer{}
+	enc := NewEncoder(w, NewNamespaceModifier())
+	var tk Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, `
+<a:Envelope xmlns:a="http://www.w3.org/2003/05/soap-envelope/" a:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
+<a:Body>
+  <b:GetPrice xmlns:b="https://www.w3schools.com/prices">
+    <b:Item>Apples</b:Item>
+  </b:GetPrice>
+</a:Body>
+</a:Envelope>`, w.String())
+}
+
+func TestAttributesWithPrefixes(t *testing.T) {
+	// given
+	input := `
+<ns1:a xmlns:ns1="http://ns1" ns1:attr1="val1">
+<ns1:b>
+  <b:c xmlns:b="http://ns2">
+    <b:d>Test</b:d>
+  </b:c>
+</ns1:b>
+</ns1:a>`
+	dec := NewDecoder(strings.NewReader(input))
+	w := &bytes.Buffer{}
+	enc := NewEncoder(w, NewNamespaceModifier())
+	var tk Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, `
+<a:a xmlns:a="http://ns1" a:attr1="val1">
+<a:b>
+  <b:c xmlns:b="http://ns2">
+    <b:d>Test</b:d>
+  </b:c>
+</a:b>
+</a:a>`, w.String())
+}
+
+func TestProcInst(t *testing.T) {
+	// given
+	input := `
+<?xml version="1.0"?>
+<ns1 xmlns:ns1="http://ns1" ns1:attr1="val1"></ns1:a>`
+	dec := NewDecoder(strings.NewReader(input))
+	w := &bytes.Buffer{}
+	enc := NewEncoder(w, NewNamespaceModifier())
+	var tk Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, `
+<?xml version="1.0"?>
+<ns1 xmlns:a="http://ns1" ns1:attr1="val1"/>`, w.String())
+}
+
 func decodeEncode(t *testing.T, dec Decoder, enc *Encoder, tk *Token) {
 	for {
 		err := dec.NextToken(tk)

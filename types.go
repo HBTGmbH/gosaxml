@@ -30,7 +30,7 @@ const (
 type Token struct {
 	Kind byte
 
-	// only for TokenTypeStartElement and TokenTypeEndElement
+	// only for TokenTypeStartElement, TokenTypeEndElement and TokenTypeProcInst
 	Name Name
 
 	// only for TokenTypeStartElement
