@@ -169,6 +169,7 @@ func (thiz *decoder) decodeProcInst(t *Token) error {
 					thiz.bb = append(thiz.bb, b, b2)
 					break
 				}
+				thiz.bb = append(thiz.bb, b2)
 			}
 		} else {
 			thiz.bb = append(thiz.bb, b)
