@@ -149,6 +149,44 @@ func TestBeginTextEnd(t *testing.T) {
 		"</a:a>", bb.String())
 }
 
+func TestAttributeWithSingleQuote(t *testing.T) {
+	// given
+	bb := &bytes.Buffer{}
+	dec := NewDecoder(strings.NewReader(
+		"<a attr1='https://mynam\"espace'>" +
+			"Hello, World!" +
+			"</a>"))
+	enc := NewEncoder(bb, NewNamespaceModifier())
+	var tk Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, "<a attr1='https://mynam\"espace'>"+
+		"Hello, World!"+
+		"</a>", bb.String())
+}
+
+func TestAttributeWithDoubleQuote(t *testing.T) {
+	// given
+	bb := &bytes.Buffer{}
+	dec := NewDecoder(strings.NewReader(
+		"<a attr1=\"https://mynam'espace\">" +
+			"Hello, World!" +
+			"</a>"))
+	enc := NewEncoder(bb, NewNamespaceModifier())
+	var tk Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, "<a attr1=\"https://mynam'espace\">"+
+		"Hello, World!"+
+		"</a>", bb.String())
+}
+
 func TestElementsAndAttributes(t *testing.T) {
 	// given
 	bb := &bytes.Buffer{}
