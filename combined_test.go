@@ -281,10 +281,10 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
 func TestAttributesWithPrefixes(t *testing.T) {
 	// given
 	input := `
-<ns1:a xmlns:ns1="http://ns1" ns1:attr1="val1">
+<ns1:a xmlns:ns1="http://ns1" ns1:attr1="val1" ns2:attr2="val2" xmlns:ns2="http://ns2">
 <ns1:b>
-  <b:c xmlns:b="http://ns2">
-    <b:d>Test</b:d>
+  <b:c xmlns:b="http://ns2" ns2:attr3="val3">
+    <b:d ns1:attr4="val4">Test</b:d>
   </b:c>
 </ns1:b>
 </ns1:a>`
@@ -298,10 +298,10 @@ func TestAttributesWithPrefixes(t *testing.T) {
 
 	// then
 	assert.Equal(t, `
-<a:a xmlns:a="http://ns1" a:attr1="val1">
+<a:a xmlns:a="http://ns1" a:attr1="val1" b:attr2="val2" xmlns:b="http://ns2">
 <a:b>
-  <b:c xmlns:b="http://ns2">
-    <b:d>Test</b:d>
+  <b:c b:attr3="val3">
+    <b:d a:attr4="val4">Test</b:d>
   </b:c>
 </a:b>
 </a:a>`, w.String())
@@ -323,7 +323,7 @@ func TestProcInst(t *testing.T) {
 	// then
 	assert.Equal(t, `
 <?xml version="1.0"?>
-<ns1 xmlns:a="http://ns1" ns1:attr1="val1"/>`, w.String())
+<ns1 xmlns:a="http://ns1" a:attr1="val1"/>`, w.String())
 }
 
 func decodeEncode(t *testing.T, dec Decoder, enc *Encoder, tk *Token) {

@@ -54,16 +54,20 @@ func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
 
 func (thiz *NamespaceModifier) processElementName(t *Token) {
 	if t.Kind == TokenTypeStartElement {
-		// Did we rewrite the prefix?
-		prefix := thiz.findPrefixAlias(t.Name.Prefix)
-		if prefix != nil {
+		if len(thiz.prefixAliasesKeys) > 0 {
+			// check attributes for rewritten prefixes
 			for i := 0; i < len(t.Attr); i++ {
 				attr := &t.Attr[i]
-				if bytes.Equal(attr.Name.Prefix, t.Name.Prefix) {
+				prefix := thiz.findPrefixAlias(attr.Name.Prefix)
+				if prefix != nil {
 					attr.Name.Prefix = prefix
 				}
 			}
-			t.Name.Prefix = prefix
+			// Did we rewrite the element name prefix?
+			prefix := thiz.findPrefixAlias(t.Name.Prefix)
+			if prefix != nil {
+				t.Name.Prefix = prefix
+			}
 		}
 	} else if t.Kind == TokenTypeEndElement {
 		t.Name = thiz.openNames[thiz.top]
