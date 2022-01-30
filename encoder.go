@@ -12,6 +12,21 @@ const (
 	namespaceAliases = "abcdefghijklmnopqrstuvwxyz"
 )
 
+// pre-allocate all constant byte slices that we write
+var (
+	angleOpen       = bs("<")
+	angleClose      = bs(">")
+	slashAngleClose = bs("/>")
+	angleOpenSlash  = bs("</")
+	space           = bs(" ")
+	equal           = bs("=")
+	angleOpenQuest  = bs("<?")
+	questAngleClose = bs("?>")
+	colon           = bs(":")
+	singleQuote     = bs("'")
+	doubleQuote     = bs("\"")
+)
+
 // EncoderMiddleware allows to pre-process a Token before
 // it is finally encoded/written.
 type EncoderMiddleware interface {
@@ -112,7 +127,7 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(bs("<"))
+	_, err = thiz.w.Write(angleOpen)
 	if err != nil {
 		return err
 	}
@@ -130,7 +145,7 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 
 	// write attributes
 	for _, attr := range t.Attr {
-		_, err = thiz.w.Write(bs(" "))
+		_, err = thiz.w.Write(space)
 		if err != nil {
 			return err
 		}
@@ -138,7 +153,7 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 		if err != nil {
 			return err
 		}
-		_, err = thiz.w.Write(bs("="))
+		_, err = thiz.w.Write(equal)
 		if err != nil {
 			return err
 		}
@@ -158,7 +173,7 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if thiz.lastStartElement {
 		// the last seen token was a StartElement, so this
 		// token can only be its accompanying EndElement.
-		_, err := thiz.w.Write(bs("/>"))
+		_, err := thiz.w.Write(slashAngleClose)
 		if err != nil {
 			return err
 		}
@@ -169,7 +184,7 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(bs("</"))
+	_, err = thiz.w.Write(angleOpenSlash)
 	if err != nil {
 		return err
 	}
@@ -177,7 +192,7 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(bs(">"))
+	_, err = thiz.w.Write(angleClose)
 	if err != nil {
 		return err
 	}
@@ -202,7 +217,7 @@ func (thiz Encoder) writeName(n Name) error {
 		if err != nil {
 			return err
 		}
-		_, err = thiz.w.Write(bs(":"))
+		_, err = thiz.w.Write(colon)
 		if err != nil {
 			return err
 		}
@@ -214,12 +229,12 @@ func (thiz Encoder) writeName(n Name) error {
 	return nil
 }
 
-func (thiz Encoder) writeString(s []byte, singleQuote bool) error {
+func (thiz Encoder) writeString(s []byte, useSingleQuote bool) error {
 	var err error
-	if singleQuote {
-		_, err = thiz.w.Write(bs("'"))
+	if useSingleQuote {
+		_, err = thiz.w.Write(singleQuote)
 	} else {
-		_, err = thiz.w.Write(bs("\""))
+		_, err = thiz.w.Write(doubleQuote)
 	}
 	if err != nil {
 		return err
@@ -228,10 +243,10 @@ func (thiz Encoder) writeString(s []byte, singleQuote bool) error {
 	if err != nil {
 		return err
 	}
-	if singleQuote {
-		_, err = thiz.w.Write(bs("'"))
+	if useSingleQuote {
+		_, err = thiz.w.Write(singleQuote)
 	} else {
-		_, err = thiz.w.Write(bs("\""))
+		_, err = thiz.w.Write(doubleQuote)
 	}
 	return nil
 }
@@ -248,7 +263,7 @@ func (thiz *Encoder) encodeTextElement(t *Token) error {
 func (thiz *Encoder) endLastStartElement() error {
 	if thiz.lastStartElement {
 		// end the last StartElement with its ">"
-		_, err := thiz.w.Write(bs(">"))
+		_, err := thiz.w.Write(angleClose)
 		if err != nil {
 			return err
 		}
@@ -270,7 +285,7 @@ func (thiz *Encoder) encodeProcInst(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(bs("<?"))
+	_, err = thiz.w.Write(angleOpenQuest)
 	if err != nil {
 		return err
 	}
@@ -278,7 +293,7 @@ func (thiz *Encoder) encodeProcInst(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(bs(" "))
+	_, err = thiz.w.Write(space)
 	if err != nil {
 		return err
 	}
@@ -286,7 +301,7 @@ func (thiz *Encoder) encodeProcInst(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(bs("?>"))
+	_, err = thiz.w.Write(questAngleClose)
 	return err
 }
 
