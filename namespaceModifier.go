@@ -197,9 +197,10 @@ func (thiz *NamespaceModifier) addPrefixRewrite(original, prefix []byte) {
 	thiz.prefixAliasesOffs[thiz.top]++
 }
 
-// NamespaceOfToken returns the decoded effective namespace (as byte slice)
-// of the provided Token. The byte slice will be from a pre-allocated pool
-// in the Encoder and must not be accessed once the Token got out of scope in the Encoder.
+// NamespaceOfToken returns the effective namespace (as byte slice)
+// of the pointed-to Token. The caller must make sure that the Token's fields/values
+// will remain unmodified for the lexical scope of the XML element represented
+// by that token, as per the documentation of EncoderMiddleware.EncodeToken.
 func (thiz NamespaceModifier) NamespaceOfToken(t *Token) []byte {
 	prefix := t.Name.Prefix
 	if len(prefix) > 0 {

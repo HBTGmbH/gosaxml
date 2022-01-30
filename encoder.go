@@ -17,6 +17,13 @@ const (
 type EncoderMiddleware interface {
 	// EncodeToken will be called by the Encoder before the provided Token
 	// is finally byte-encoded into the io.Writer.
+	// The Encoder will ensure that the pointed-to Token and all its contained
+	// field values will remain unmodified for the lexical scope of the
+	// XML-element represented by the Token.
+	// If, for example, the Token represents a TokenTypeStartElement, then
+	// the Token and all of its contained fields/byte-slices will contain
+	// their values until after its corresponding TokenTypeEndElement is processed
+	// by the EncoderMiddleware.
 	EncodeToken(token *Token) error
 
 	// Reset resets the state of an EncoderMiddleware.
