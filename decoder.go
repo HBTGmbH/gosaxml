@@ -57,7 +57,7 @@ func (thiz *decoder) skipWhitespaces() error {
 		if err != nil {
 			return err
 		}
-		if b != ' ' && b != '\t' && b != '\b' && b != '\r' && b != '\n' {
+		if b != '\t' && b != '\n' && b != 11 && b != '\r' && b != ' ' {
 			err = thiz.r.UnreadByte()
 			if err != nil {
 				return err
@@ -258,7 +258,7 @@ func (thiz *decoder) readName() (Name, error) {
 				Local:  local,
 				Prefix: localOrPrefix,
 			}, nil
-		case ' ', '/', '=', '>':
+		case '\t', '\n', 11, '\r', ' ', '/', '=', '>':
 			err = thiz.r.UnreadByte()
 			if err != nil {
 				return Name{}, err
@@ -280,7 +280,7 @@ func (thiz *decoder) readSimpleName() ([]byte, error) {
 			return nil, err
 		}
 		switch b {
-		case ':', '>', ' ', '/', '=':
+		case '\t', '\n', 11, '\r', ' ', '/', ':', '=', '>':
 			err = thiz.r.UnreadByte()
 			if err != nil {
 				return nil, err
