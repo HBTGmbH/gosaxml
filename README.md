@@ -52,7 +52,7 @@ func TestDecodeAndEncode(t *testing.T) {
 		`<a xmlns="http://mynamespace.org">
 		<b>Hi!</b>
 		<c/>
-		</a>`
+		</a>`,
 		w.String())
 }
 ```
