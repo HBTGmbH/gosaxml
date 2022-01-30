@@ -22,8 +22,6 @@ type Decoder interface {
 }
 
 type decoder struct {
-	lastByte      byte
-	hasLastByte   bool
 	buf           []byte
 	r             *bufio.Reader
 	lastOpen      Name
