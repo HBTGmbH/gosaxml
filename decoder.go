@@ -162,12 +162,16 @@ func (thiz decoder) ignoreComment() error {
 				return err
 			}
 			if b2 == '-' {
-				b3, err := thiz.r.ReadByte()
-				if err != nil {
-					return err
-				}
-				if b3 == '>' {
-					return nil
+				for {
+					b3, err := thiz.r.ReadByte()
+					if err != nil {
+						return err
+					}
+					if b3 == '>' {
+						return nil
+					} else if b3 != '-' {
+						break
+					}
 				}
 			}
 		}

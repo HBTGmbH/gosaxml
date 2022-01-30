@@ -158,6 +158,25 @@ func TestDecodeNested2(t *testing.T) {
 	assertEndElement(t, "d111", tk)
 }
 
+func TestIgnoreComments(t *testing.T) {
+	// given
+	doc := "<a><!-- Helo -- --- ---></a>"
+	dec := NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+	var t1, t2, t3 Token
+
+	// when
+	err1 := dec.NextToken(&t1)
+	err2 := dec.NextToken(&t2)
+	err3 := dec.NextToken(&t3)
+
+	// then
+	assert.Nil(t, err1)
+	assert.Equal(t, startElement("a"), t1)
+	assert.Nil(t, err2)
+	assertEndElement(t, "a", t2)
+	assert.Equal(t, io.EOF, err3)
+}
+
 func assertTextElement(t *testing.T, text string, token Token) {
 	assert.Equal(t, uint8(TokenTypeTextElement), token.Kind)
 	assert.Equal(t, []byte(text), token.ByteData)
