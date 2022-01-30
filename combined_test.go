@@ -228,6 +228,25 @@ func BenchmarkElementsAndAttributes(b *testing.B) {
 	}
 }
 
+func TestAttributesWithNamespace(t *testing.T) {
+	// given
+	input := `
+<soap:Envelope
+xmlns:soap="http://www.w3.org/2003/05/soap-envelope/"
+soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding"></soap:Envelope>`
+	dec := NewDecoder(strings.NewReader(input))
+	w := &bytes.Buffer{}
+	enc := NewEncoder(w, NewNamespaceModifier())
+	var tk Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, `
+<a:Envelope xmlns:a="http://www.w3.org/2003/05/soap-envelope/" a:encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>`, w.String())
+}
+
 func decodeEncode(t *testing.T, dec Decoder, enc *Encoder, tk *Token) {
 	for {
 		err := dec.NextToken(tk)

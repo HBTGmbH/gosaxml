@@ -57,6 +57,12 @@ func (thiz *NamespaceModifier) processElementName(t *Token) {
 		// Did we rewrite the prefix?
 		prefix := thiz.findPrefixAlias(t.Name.Prefix)
 		if prefix != nil {
+			for i := 0; i < len(t.Attr); i++ {
+				attr := &t.Attr[i]
+				if bytes.Equal(attr.Name.Prefix, t.Name.Prefix) {
+					attr.Name.Prefix = prefix
+				}
+			}
 			t.Name.Prefix = prefix
 		}
 	} else if t.Kind == TokenTypeEndElement {
