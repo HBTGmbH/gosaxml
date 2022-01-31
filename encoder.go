@@ -307,9 +307,6 @@ func (thiz *Encoder) encodeProcInst(t *Token) error {
 
 // https://stackoverflow.com/questions/59209493/how-to-use-unsafe-get-a-byte-slice-from-a-string-without-memory-copy#answer-59210739
 func bs(s string) []byte {
-	if s == "" {
-		return []byte{}
-	}
 	return (*[0x7fff0000]byte)(unsafe.Pointer(
 		(*reflect.StringHeader)(unsafe.Pointer(&s)).Data),
 	)[:len(s):len(s)]
