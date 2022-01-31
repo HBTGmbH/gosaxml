@@ -23,21 +23,19 @@ type Decoder interface {
 }
 
 type decoder struct {
-	buf                 []byte
 	r                   *bufio.Reader
 	lastOpen            Name
 	bb                  []byte
 	bbOffset            []int
 	attrs               []Attr
 	numAttributes       []int
-	top                 int
 	preserveWhitespaces []bool
+	top                 int
 }
 
 // NewDecoder creates a new Decoder.
 func NewDecoder(r io.Reader) Decoder {
 	return &decoder{
-		buf:                 make([]byte, 1, 1),
 		r:                   bufio.NewReader(r),
 		bb:                  make([]byte, 0, 256),
 		bbOffset:            make([]int, 256),
