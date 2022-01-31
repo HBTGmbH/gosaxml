@@ -144,7 +144,8 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 	}
 
 	// write attributes
-	for _, attr := range t.Attr {
+	for i := 0; i < len(t.Attr); i++ {
+		attr := &t.Attr[i]
 		_, err = thiz.w.Write(space)
 		if err != nil {
 			return err
