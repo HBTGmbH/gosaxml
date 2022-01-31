@@ -155,6 +155,7 @@ func (thiz *decoder) decodeProcInst(t *Token) error {
 		return err
 	}
 	i := len(thiz.bb)
+	j := i
 	for {
 		b, err := thiz.r.ReadByte()
 		if err != nil {
@@ -169,16 +170,25 @@ func (thiz *decoder) decodeProcInst(t *Token) error {
 				if b2 == '>' {
 					t.Kind = TokenTypeProcInst
 					t.Name = name
-					t.ByteData = thiz.bb[i:len(thiz.bb)]
+					t.ByteData = thiz.bb[i:j]
 					return nil
 				} else if b2 != '?' {
 					thiz.bb = append(thiz.bb, b, b2)
+					if !isWhitespace(b2) {
+						j = len(thiz.bb)
+					}
 					break
 				}
 				thiz.bb = append(thiz.bb, b2)
+				if !isWhitespace(b2) {
+					j = len(thiz.bb)
+				}
 			}
 		} else {
 			thiz.bb = append(thiz.bb, b)
+			if !isWhitespace(b) {
+				j = len(thiz.bb)
+			}
 		}
 	}
 }

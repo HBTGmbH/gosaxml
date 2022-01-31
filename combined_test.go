@@ -381,6 +381,25 @@ func TestPreserveWhitespace(t *testing.T) {
 		"<a xml:space=\"preserve\">\n</a>", w.String())
 }
 
+func TestInsignificantWhitespace(t *testing.T) {
+	// given
+	input := `
+<?xml    version="1.0"  encoding="utf-8"   ?>
+<a   xml:space = "preserve" >
+</a  >`
+	dec := gosaxml.NewDecoder(strings.NewReader(input))
+	w := &bytes.Buffer{}
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, "<?xml version=\"1.0\"  encoding=\"utf-8\"?>"+
+		"<a xml:space=\"preserve\">\n</a>", w.String())
+}
+
 func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *gosaxml.Token) {
 	for {
 		err := dec.NextToken(tk)
