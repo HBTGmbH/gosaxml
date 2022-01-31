@@ -14,12 +14,12 @@ func BenchmarkNamespaceAlias1Level(b *testing.B) {
 	r := strings.NewReader(input)
 	dec := gosaxml.NewDecoder(r)
 	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
-	var tk gosaxml.Token
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
+		var tk gosaxml.Token
 		r.Reset(input)
 		dec.Reset(r)
 		for {
@@ -86,22 +86,23 @@ func BenchmarkSameNamespaceSideBySide(b *testing.B) {
 			"</ns:a>")
 	dec := gosaxml.NewDecoder(r)
 	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
-	var tk gosaxml.Token
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		r.Seek(0, io.SeekStart)
+		var tk gosaxml.Token
+		_, err := r.Seek(0, io.SeekStart)
+		assert.Nil(b, err)
 		dec.Reset(r)
 		for {
-			err := dec.NextToken(&tk)
+			err = dec.NextToken(&tk)
 			if err == io.EOF {
 				break
-			} else if err != nil {
-				panic(err)
 			}
+			assert.Nil(b, err)
 			err = enc.EncodeToken(&tk)
+			assert.Nil(b, err)
 		}
 	}
 }
@@ -247,21 +248,21 @@ func BenchmarkElementsAndAttributes(b *testing.B) {
 			"</bookstore>")
 	dec := gosaxml.NewDecoder(r)
 	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
-	var tk gosaxml.Token
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		r.Seek(0, io.SeekStart)
+		var tk gosaxml.Token
+		_, err := r.Seek(0, io.SeekStart)
+		assert.Nil(b, err)
 		dec.Reset(r)
 		for {
-			err := dec.NextToken(&tk)
+			err = dec.NextToken(&tk)
 			if err == io.EOF {
 				break
-			} else if err != nil {
-				panic(err)
 			}
+			assert.Nil(b, err)
 			_ = enc.EncodeToken(&tk)
 		}
 	}
@@ -408,9 +409,8 @@ func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *g
 		err := dec.NextToken(tk)
 		if err == io.EOF {
 			break
-		} else if err != nil {
-			panic(err)
 		}
+		assert.Nil(t, err)
 		err = enc.EncodeToken(tk)
 		assert.Nil(t, err)
 	}

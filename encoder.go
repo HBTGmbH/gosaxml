@@ -249,7 +249,7 @@ func (thiz Encoder) writeString(s []byte, useSingleQuote bool) error {
 	} else {
 		_, err = thiz.w.Write(doubleQuote)
 	}
-	return nil
+	return err
 }
 
 func (thiz *Encoder) encodeTextElement(t *Token) error {
@@ -318,5 +318,5 @@ func bs(s string) []byte {
 func noescape(p unsafe.Pointer) unsafe.Pointer {
 	x := uintptr(p)
 	//goland:noinspection ALL
-	return unsafe.Pointer(x ^ 0)
+	return unsafe.Pointer(x)
 }

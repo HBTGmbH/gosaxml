@@ -14,12 +14,12 @@ func BenchmarkNextToken(b *testing.B) {
 	doc := "<a attr1=\"1\" attr2=\"2\" xmlns=\"https://mydomain.org\"/>"
 	r := strings.NewReader(doc)
 	dec := gosaxml.NewDecoder(r)
-	var tk gosaxml.Token
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
+		var tk gosaxml.Token
 		r.Reset(doc)
 		err1 := dec.NextToken(&tk)
 		assert.Nil(b, err1)
