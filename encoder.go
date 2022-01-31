@@ -50,6 +50,9 @@ type EncoderMiddleware interface {
 
 // Encoder encodes Token values to an io.Writer.
 type Encoder struct {
+	// middlewares can modify encoded tokens before encoding.
+	middlewares []EncoderMiddleware
+
 	// The io.Writer we encode/write into.
 	w io.Writer
 
@@ -57,9 +60,6 @@ type Encoder struct {
 	// This is used to delay encoding the ending ">" or "/>" string
 	// based on whether the element is immediately closed afterwards.
 	lastStartElement bool
-
-	// middlewares can modify encoded tokens before encoding.
-	middlewares []EncoderMiddleware
 }
 
 // NewEncoder creates a new Encoder with the given middlewares and returns a pointer to it.

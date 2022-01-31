@@ -6,17 +6,16 @@ import "bytes"
 // effective namespace of a decoded Token via NamespaceOfToken
 // and to canonicalize/minify namespace declarations.
 type NamespaceModifier struct {
-	nsKeys [][]byte
-	nsVals [][]byte
-	nsOffs []int
+	openNames         [32]Name
+	nsOffs            [32]int32
+	prefixAliasesOffs [32]int32
 
+	nsKeys            [][]byte
+	nsVals            [][]byte
 	prefixAliasesKeys [][]byte
 	prefixAliasesVals [][]byte
-	prefixAliasesOffs []int
 
-	openNames []Name
-
-	top int
+	top byte
 }
 
 // NewNamespaceModifier creates a new NamespaceModifier and returns a pointer to it.
@@ -24,13 +23,9 @@ func NewNamespaceModifier() *NamespaceModifier {
 	return &NamespaceModifier{
 		nsKeys: make([][]byte, 0, 32),
 		nsVals: make([][]byte, 0, 32),
-		nsOffs: make([]int, 32),
 
 		prefixAliasesKeys: make([][]byte, 0, 32),
 		prefixAliasesVals: make([][]byte, 0, 32),
-		prefixAliasesOffs: make([]int, 32),
-
-		openNames: make([]Name, 32),
 	}
 }
 

@@ -11,8 +11,8 @@ type Name struct {
 // Only tokens of type TokenTypeStartElement can have attributes.
 type Attr struct {
 	Name        Name
-	SingleQuote bool
 	Value       []byte
+	SingleQuote bool
 }
 
 // constants for Token.Kind
@@ -28,8 +28,6 @@ const (
 // Token represents the union of all possible token types
 // with their respective information.
 type Token struct {
-	Kind byte
-
 	// only for TokenTypeStartElement, TokenTypeEndElement and TokenTypeProcInst
 	Name Name
 
@@ -38,4 +36,6 @@ type Token struct {
 
 	// only for TokenTypeDirective, TokenTypeTextElement, TokenTypeCharData and TokenTypeProcInst
 	ByteData []byte
+
+	Kind byte
 }

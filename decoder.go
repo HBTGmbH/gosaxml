@@ -23,25 +23,22 @@ type Decoder interface {
 }
 
 type decoder struct {
-	r                   *bufio.Reader
+	bbOffset            [256]int32
+	numAttributes       [256]byte
 	lastOpen            Name
+	preserveWhitespaces [32]bool
+	r                   *bufio.Reader
 	bb                  []byte
-	bbOffset            []int
 	attrs               []Attr
-	numAttributes       []int
-	preserveWhitespaces []bool
-	top                 int
+	top                 byte
 }
 
 // NewDecoder creates a new Decoder.
 func NewDecoder(r io.Reader) Decoder {
 	return &decoder{
-		r:                   bufio.NewReader(r),
-		bb:                  make([]byte, 0, 256),
-		bbOffset:            make([]int, 256),
-		attrs:               make([]Attr, 0, 256),
-		numAttributes:       make([]int, 256),
-		preserveWhitespaces: make([]bool, 32),
+		r:     bufio.NewReader(r),
+		bb:    make([]byte, 0, 256),
+		attrs: make([]Attr, 0, 256),
 	}
 }
 
@@ -224,7 +221,7 @@ func (thiz decoder) ignoreComment() error {
 }
 
 func (thiz *decoder) decodeEndElement(t *Token, name Name) error {
-	end := len(thiz.attrs) - thiz.numAttributes[thiz.top]
+	end := len(thiz.attrs) - int(thiz.numAttributes[thiz.top])
 	thiz.attrs = thiz.attrs[0:end]
 	thiz.bb = thiz.bb[:thiz.bbOffset[thiz.top]]
 	t.Kind = TokenTypeEndElement
@@ -236,7 +233,7 @@ func (thiz *decoder) decodeEndElement(t *Token, name Name) error {
 func (thiz *decoder) decodeStartElement(t *Token) error {
 	thiz.top++
 	thiz.numAttributes[thiz.top] = 0
-	thiz.bbOffset[thiz.top] = len(thiz.bb)
+	thiz.bbOffset[thiz.top] = int32(len(thiz.bb))
 	thiz.preserveWhitespaces[thiz.top+1] = thiz.preserveWhitespaces[thiz.top]
 	name, err := thiz.readName()
 	if err != nil {
