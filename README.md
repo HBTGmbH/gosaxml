@@ -49,10 +49,7 @@ func TestDecodeAndEncode(t *testing.T) {
 
 	// then
 	assert.Equal(t,
-		`<a xmlns="http://mynamespace.org">
-		<b>Hi!</b>
-		<c/>
-		</a>`,
-		w.String())
+	`<a xmlns="http://mynamespace.org"><b>Hi!</b><c/></a>`,
+	w.String())
 }
 ```
