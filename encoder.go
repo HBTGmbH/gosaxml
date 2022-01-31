@@ -316,5 +316,6 @@ func bs(s string) []byte {
 //go:nosplit
 func noescape(p unsafe.Pointer) unsafe.Pointer {
 	x := uintptr(p)
+	//goland:noinspection ALL
 	return unsafe.Pointer(x ^ 0)
 }

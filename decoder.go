@@ -113,7 +113,7 @@ func (thiz *decoder) NextToken(t *Token) error {
 						return err
 					}
 				case '[':
-					return thiz.readCDATA(t)
+					return thiz.readCDATA()
 				default:
 					return errors.New("invalid XML: comment or CDATA expected")
 				}
@@ -135,7 +135,7 @@ func (thiz *decoder) NextToken(t *Token) error {
 			if err != nil {
 				return err
 			}
-			err, cntn := thiz.decodeText(t)
+			cntn, err := thiz.decodeText(t)
 			if err != nil || !cntn {
 				return err
 			}
@@ -253,26 +253,26 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 	return nil
 }
 
-func (thiz *decoder) decodeText(t *Token) (error, bool) {
+func (thiz *decoder) decodeText(t *Token) (bool, error) {
 	i := len(thiz.bb)
 	onlyWhitespaces := true
 	for {
 		b, err := thiz.r.ReadByte()
 		if err != nil {
-			return err, false
+			return false, err
 		}
 		switch b {
 		case '<':
 			err = thiz.r.UnreadByte()
 			if err != nil {
-				return err, false
+				return false, err
 			}
 			if onlyWhitespaces && !thiz.preserveWhitespaces[thiz.top] {
-				return nil, true
+				return true, nil
 			}
 			t.Kind = TokenTypeTextElement
 			t.ByteData = thiz.bb[i:len(thiz.bb)]
-			return nil, false
+			return false, nil
 		default:
 			onlyWhitespaces = onlyWhitespaces && isWhitespace(b)
 			thiz.bb = append(thiz.bb, b)
@@ -284,7 +284,7 @@ func isWhitespace(b byte) bool {
 	return b == '\t' || b == '\n' || b == '\r' || b == ' '
 }
 
-func (thiz decoder) readCDATA(t *Token) error {
+func (thiz decoder) readCDATA() error {
 	// discard "CDATA["
 	_, err := thiz.r.Discard(6)
 	if err != nil {

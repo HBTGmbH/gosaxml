@@ -18,5 +18,9 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - run: go build -v ./...
-      - run: go test -v ./...
+      - run: |
+          go install github.com/mgechev/revive@latest
+          go vet -unsafeptr=false .
+          revive -config revive.toml .
+      - run: go build -v .
+      - run: go test -v .
