@@ -282,8 +282,7 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding"></soap:Envelope>`
 	decodeEncode(t, dec, enc, &tk)
 
 	// then
-	assert.Equal(t, `
-<a:Envelope xmlns:a="http://www.w3.org/2003/05/soap-envelope/" a:encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>`, w.String())
+	assert.Equal(t, `<a:Envelope xmlns:a="http://www.w3.org/2003/05/soap-envelope/" a:encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>`, w.String())
 }
 
 func TestSOAP(t *testing.T) {
@@ -307,14 +306,14 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
 	decodeEncode(t, dec, enc, &tk)
 
 	// then
-	assert.Equal(t, `
-<a:Envelope xmlns:a="http://www.w3.org/2003/05/soap-envelope/" a:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
-<a:Body>
-  <b:GetPrice xmlns:b="https://www.w3schools.com/prices">
-    <b:Item>Apples</b:Item>
-  </b:GetPrice>
-</a:Body>
-</a:Envelope>`, w.String())
+	assert.Equal(t, "<a:Envelope xmlns:a=\"http://www.w3.org/2003/05/soap-envelope/\" "+
+		"a:encodingStyle=\"http://www.w3.org/2003/05/soap-encoding\">"+
+		"<a:Body>"+
+		"<b:GetPrice xmlns:b=\"https://www.w3schools.com/prices\">"+
+		"<b:Item>Apples</b:Item>"+
+		"</b:GetPrice>"+
+		"</a:Body>"+
+		"</a:Envelope>", w.String())
 }
 
 func TestAttributesWithPrefixes(t *testing.T) {
@@ -336,14 +335,13 @@ func TestAttributesWithPrefixes(t *testing.T) {
 	decodeEncode(t, dec, enc, &tk)
 
 	// then
-	assert.Equal(t, `
-<a:a xmlns:a="http://ns1" a:attr1="val1" b:attr2="val2" xmlns:b="http://ns2">
-<a:b>
-  <b:c b:attr3="val3">
-    <b:d a:attr4="val4">Test</b:d>
-  </b:c>
-</a:b>
-</a:a>`, w.String())
+	assert.Equal(t, "<a:a xmlns:a=\"http://ns1\" a:attr1=\"val1\" b:attr2=\"val2\" xmlns:b=\"http://ns2\">"+
+		"<a:b>"+
+		"<b:c b:attr3=\"val3\">"+
+		"<b:d a:attr4=\"val4\">Test</b:d>"+
+		"</b:c>"+
+		"</a:b>"+
+		"</a:a>", w.String())
 }
 
 func TestProcInst(t *testing.T) {
@@ -360,9 +358,8 @@ func TestProcInst(t *testing.T) {
 	decodeEncode(t, dec, enc, &tk)
 
 	// then
-	assert.Equal(t, `
-<?xml version="1.0"?>
-<ns1 xmlns:a="http://ns1" a:attr1="val1"/>`, w.String())
+	assert.Equal(t, "<?xml version=\"1.0\"?>"+
+		"<ns1 xmlns:a=\"http://ns1\" a:attr1=\"val1\"/>", w.String())
 }
 
 func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *gosaxml.Token) {

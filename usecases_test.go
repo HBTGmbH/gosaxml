@@ -44,13 +44,12 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
 			bytes.Equal(tk.Name.Local, []byte("GetPrice")) &&
 			bytes.Equal(nm.NamespaceOfToken(&tk), []byte(pricesNamespace)) {
 
-			// inject '\n    <m:Item>Apples</m:Item>' here.
+			// inject '<m:Item>Apples</m:Item>' here.
 			// We do not know the concrete prefix to use, but we _do_ know the namespace
 			// that we want the new element to reside in (this is usually known in advance).
-			// So, we can add a gosaxml.Token of kind gosaxml.TokenTypeStartElement with an "xmlns" attribute
+			// So, we can add a Token of kind TokenTypeStartElement with an "xmlns" attribute
 			// which the NamespaceModifier will then translate to the already known prefix
 			// for that namespace.
-			addTextToken(t, enc, "\n    ")
 			addStartElement(t, enc, "Item", pricesNamespace)
 			addTextToken(t, enc, "Apples")
 			addEndElement(t, enc)
@@ -58,15 +57,11 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
 	}
 
 	// then
-	assert.Equal(t, `
-<a:Envelope xmlns:a="http://www.w3.org/2003/05/soap-envelope/" a:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
-<a:Body>
-  <b:GetPrice xmlns:b="https://www.w3schools.com/prices">
-    <b:Item>Apples</b:Item>
-    
-  </b:GetPrice>
-</a:Body>
-</a:Envelope>`, w.String())
+	assert.Equal(t, "<a:Envelope xmlns:a=\"http://www.w3.org/2003/05/soap-envelope/\" "+
+		"a:encodingStyle=\"http://www.w3.org/2003/05/soap-encoding\">"+
+		"<a:Body>"+
+		"<b:GetPrice xmlns:b=\"https://www.w3schools.com/prices\">"+
+		"<b:Item>Apples</b:Item></b:GetPrice></a:Body></a:Envelope>", w.String())
 }
 
 func addEndElement(t *testing.T, enc *gosaxml.Encoder) {

@@ -2,6 +2,7 @@ package gosaxml
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -22,25 +23,27 @@ type Decoder interface {
 }
 
 type decoder struct {
-	buf           []byte
-	r             *bufio.Reader
-	lastOpen      Name
-	bb            []byte
-	bbOffset      []int
-	attrs         []Attr
-	numAttributes []int
-	top           int
+	buf                 []byte
+	r                   *bufio.Reader
+	lastOpen            Name
+	bb                  []byte
+	bbOffset            []int
+	attrs               []Attr
+	numAttributes       []int
+	top                 int
+	preserveWhitespaces []bool
 }
 
 // NewDecoder creates a new Decoder.
 func NewDecoder(r io.Reader) Decoder {
 	return &decoder{
-		buf:           make([]byte, 1, 1),
-		r:             bufio.NewReader(r),
-		bb:            make([]byte, 0, 256),
-		bbOffset:      make([]int, 256),
-		attrs:         make([]Attr, 0, 256),
-		numAttributes: make([]int, 256),
+		buf:                 make([]byte, 1, 1),
+		r:                   bufio.NewReader(r),
+		bb:                  make([]byte, 0, 256),
+		bbOffset:            make([]int, 256),
+		attrs:               make([]Attr, 0, 256),
+		numAttributes:       make([]int, 256),
+		preserveWhitespaces: make([]bool, 32),
 	}
 }
 
@@ -57,7 +60,7 @@ func (thiz *decoder) skipWhitespaces() error {
 		if err != nil {
 			return err
 		}
-		if b != '\t' && b != '\n' && b != 11 && b != '\r' && b != ' ' {
+		if !isWhitespace(b) {
 			err = thiz.r.UnreadByte()
 			if err != nil {
 				return err
@@ -134,7 +137,10 @@ func (thiz *decoder) NextToken(t *Token) error {
 			if err != nil {
 				return err
 			}
-			return thiz.decodeText(t)
+			err, cntn := thiz.decodeText(t)
+			if err != nil || !cntn {
+				return err
+			}
 		}
 	}
 }
@@ -221,14 +227,13 @@ func (thiz *decoder) decodeEndElement(t *Token, name Name) error {
 
 func (thiz *decoder) decodeStartElement(t *Token) error {
 	thiz.numAttributes[thiz.top] = 0
-	if thiz.top > 0 {
-		thiz.bbOffset[thiz.top] = len(thiz.bb)
-	}
+	thiz.bbOffset[thiz.top] = len(thiz.bb)
+	thiz.preserveWhitespaces[thiz.top+1] = thiz.preserveWhitespaces[thiz.top]
 	name, err := thiz.readName()
 	if err != nil {
 		return err
 	}
-	attributes, err := thiz.readAttributes()
+	attributes, err := thiz.decodeAttributes()
 	if err != nil {
 		return err
 	}
@@ -240,26 +245,35 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 	return nil
 }
 
-func (thiz *decoder) decodeText(t *Token) error {
+func (thiz *decoder) decodeText(t *Token) (error, bool) {
 	i := len(thiz.bb)
+	onlyWhitespaces := true
 	for {
 		b, err := thiz.r.ReadByte()
 		if err != nil {
-			return err
+			return err, false
 		}
 		switch b {
 		case '<':
 			err = thiz.r.UnreadByte()
 			if err != nil {
-				return err
+				return err, false
+			}
+			if onlyWhitespaces && !thiz.preserveWhitespaces[thiz.top] {
+				return nil, true
 			}
 			t.Kind = TokenTypeTextElement
 			t.ByteData = thiz.bb[i:len(thiz.bb)]
-			return nil
+			return nil, false
 		default:
+			onlyWhitespaces = onlyWhitespaces && isWhitespace(b)
 			thiz.bb = append(thiz.bb, b)
 		}
 	}
+}
+
+func isWhitespace(b byte) bool {
+	return b == '\t' || b == '\n' || b == '\r' || b == ' '
 }
 
 func (thiz decoder) readCDATA(t *Token) error {
@@ -291,7 +305,7 @@ func (thiz *decoder) readName() (Name, error) {
 				Local:  local,
 				Prefix: localOrPrefix,
 			}, nil
-		case '\t', '\n', 11, '\r', ' ', '/', '=', '>':
+		case '\t', '\n', '\r', ' ', '/', '=', '>':
 			err = thiz.r.UnreadByte()
 			if err != nil {
 				return Name{}, err
@@ -313,7 +327,7 @@ func (thiz *decoder) readSimpleName() ([]byte, error) {
 			return nil, err
 		}
 		switch b {
-		case '\t', '\n', 11, '\r', ' ', '/', ':', '=', '>':
+		case '\t', '\n', '\r', ' ', '/', ':', '=', '>':
 			err = thiz.r.UnreadByte()
 			if err != nil {
 				return nil, err
@@ -325,7 +339,7 @@ func (thiz *decoder) readSimpleName() ([]byte, error) {
 	}
 }
 
-func (thiz *decoder) readAttributes() ([]Attr, error) {
+func (thiz *decoder) decodeAttributes() ([]Attr, error) {
 	i := len(thiz.attrs)
 	for {
 		err := thiz.skipWhitespaces()
@@ -350,7 +364,7 @@ func (thiz *decoder) readAttributes() ([]Attr, error) {
 			}
 			i := len(thiz.attrs)
 			thiz.attrs = thiz.attrs[:i+1]
-			err := thiz.readAttribute(&thiz.attrs[i])
+			err := thiz.decodeAttribute(&thiz.attrs[i])
 			if err != nil {
 				return nil, err
 			}
@@ -359,11 +373,11 @@ func (thiz *decoder) readAttributes() ([]Attr, error) {
 	}
 }
 
-// readAttribute parses a single XML attribute
-// after this function returns, the next reader symbol
+// decodeAttribute parses a single XML attribute.
+// After this function returns, the next reader symbol
 // is the byte after the closing single or double quote
 // of the attribute's value.
-func (thiz *decoder) readAttribute(attr *Attr) error {
+func (thiz *decoder) decodeAttribute(attr *Attr) error {
 	name, err := thiz.readName()
 	if err != nil {
 		return err
@@ -386,6 +400,10 @@ func (thiz *decoder) readAttribute(attr *Attr) error {
 	value, singleQuote, err := thiz.readString()
 	if err != nil {
 		return err
+	}
+	// xml:space?
+	if bytes.Equal(name.Prefix, bs("xml")) && bytes.Equal(name.Local, bs("space")) {
+		thiz.preserveWhitespaces[thiz.top] = bytes.Equal(value, bs("preserve"))
 	}
 	attr.Name = name
 	attr.SingleQuote = singleQuote
