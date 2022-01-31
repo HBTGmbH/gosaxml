@@ -19,8 +19,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - run: |
-          go install github.com/mgechev/revive@latest
+          gofmt -l . && test -z $(gofmt -l .)
           go vet -unsafeptr=false .
+          go install github.com/mgechev/revive@latest
           revive -config revive.toml .
       - run: go build -v .
       - run: go test -v .
