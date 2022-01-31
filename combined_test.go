@@ -367,6 +367,7 @@ func TestPreserveWhitespace(t *testing.T) {
 	input := `
 <?xml version="1.0"?>
 <a xml:space="preserve">
+<b attr1=" value ">  significantWhitespace  </b>
 </a>`
 	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	w := &bytes.Buffer{}
@@ -378,7 +379,9 @@ func TestPreserveWhitespace(t *testing.T) {
 
 	// then
 	assert.Equal(t, "<?xml version=\"1.0\"?>"+
-		"<a xml:space=\"preserve\">\n</a>", w.String())
+		"<a xml:space=\"preserve\">\n"+
+		"<b attr1=\" value \">  significantWhitespace  </b>\n"+
+		"</a>", w.String())
 }
 
 func TestInsignificantWhitespace(t *testing.T) {
