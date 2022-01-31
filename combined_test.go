@@ -348,7 +348,7 @@ func TestProcInst(t *testing.T) {
 	// given
 	input := `
 <?xml version="1.0"?>
-<ns1 xmlns:ns1="http://ns1" ns1:attr1="val1"></ns1:a>`
+<ns1:a xmlns:ns1="http://ns1" ns1:attr1="val1"></ns1:a>`
 	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	w := &bytes.Buffer{}
 	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
@@ -359,7 +359,26 @@ func TestProcInst(t *testing.T) {
 
 	// then
 	assert.Equal(t, "<?xml version=\"1.0\"?>"+
-		"<ns1 xmlns:a=\"http://ns1\" a:attr1=\"val1\"/>", w.String())
+		"<a:a xmlns:a=\"http://ns1\" a:attr1=\"val1\"/>", w.String())
+}
+
+func TestPreserveWhitespace(t *testing.T) {
+	// given
+	input := `
+<?xml version="1.0"?>
+<a xml:space="preserve">
+</a>`
+	dec := gosaxml.NewDecoder(strings.NewReader(input))
+	w := &bytes.Buffer{}
+	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, "<?xml version=\"1.0\"?>"+
+		"<a xml:space=\"preserve\">\n</a>", w.String())
 }
 
 func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *gosaxml.Token) {

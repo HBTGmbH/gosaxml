@@ -216,16 +216,17 @@ func (thiz decoder) ignoreComment() error {
 }
 
 func (thiz *decoder) decodeEndElement(t *Token, name Name) error {
-	thiz.top--
 	end := len(thiz.attrs) - thiz.numAttributes[thiz.top]
 	thiz.attrs = thiz.attrs[0:end]
 	thiz.bb = thiz.bb[:thiz.bbOffset[thiz.top]]
 	t.Kind = TokenTypeEndElement
 	t.Name = name
+	thiz.top--
 	return nil
 }
 
 func (thiz *decoder) decodeStartElement(t *Token) error {
+	thiz.top++
 	thiz.numAttributes[thiz.top] = 0
 	thiz.bbOffset[thiz.top] = len(thiz.bb)
 	thiz.preserveWhitespaces[thiz.top+1] = thiz.preserveWhitespaces[thiz.top]
@@ -238,7 +239,6 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 		return err
 	}
 	thiz.lastOpen = name
-	thiz.top++
 	t.Kind = TokenTypeStartElement
 	t.Name = name
 	t.Attr = attributes
