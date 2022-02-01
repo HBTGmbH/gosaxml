@@ -1,4 +1,4 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/HBTGmbH/gosaxml.svg)](https://pkg.go.dev/github.com/HBTGmbH/gosaxml) [![Go Report Card](https://goreportcard.com/badge/github.com/HBTGmbH/gosaxml)](https://goreportcard.com/report/github.com/HBTGmbH/gosaxml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/HBTGmbH/gosaxml.svg)](https://pkg.go.dev/github.com/HBTGmbH/gosaxml) [![Go Report Card](https://goreportcard.com/badge/github.com/HBTGmbH/gosaxml)](https://goreportcard.com/report/github.com/HBTGmbH/gosaxml) [![build workflow](https://github.com/HBTGmbH/gosaxml/actions/workflows/build.yml/badge.svg)](https://github.com/HBTGmbH/gosaxml/actions/workflows/build.yml)
 
 gosaxml is a streaming XML decoder and encoder, similar in interface to the `encoding/xml`, but with a focus on performance, low memory footprint and on
 fixing many of the issues present in `encoding/xml` mainly related to handling of namespaces (see https://github.com/golang/go/issues/13400).
