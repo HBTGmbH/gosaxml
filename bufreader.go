@@ -1,6 +1,7 @@
 package gosaxml
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 )
@@ -44,6 +45,23 @@ func (b *bufreader) unreadByte() error {
 	}
 	b.r--
 	return nil
+}
+
+func (b *bufreader) unreadBytes(n int) {
+	b.r -= n
+}
+
+func (b *bufreader) readUint64() (uint64, int, error) {
+	if b.r+8 > b.w {
+		_ = b.read0()
+	}
+	n := b.w - b.r
+	if n > 8 {
+		n = 8
+	}
+	u := binary.LittleEndian.Uint64(b.buf[b.r : b.r+8])
+	b.r += n
+	return u, n, nil
 }
 
 func (b *bufreader) reset(r io.Reader) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/bits"
 )
 
 // Decoder decodes an XML input stream into Token values.
@@ -428,27 +429,43 @@ func (thiz *decoder) readString() ([]byte, bool, error) {
 	}
 	i := len(thiz.bb)
 	singleQuote := b == '\''
+	var p uint64
+	if singleQuote {
+		p = pSQ
+	} else {
+		p = pDQ
+	}
 	for {
-		b, err := thiz.r.readByte()
+		u, n, err := thiz.r.readUint64()
 		if err != nil {
 			return nil, false, err
 		}
-		switch b {
-		case '"':
-			if !singleQuote {
-				if err != nil {
-					return nil, false, err
-				}
-				return thiz.bb[i:len(thiz.bb)], singleQuote, nil
-			}
-		case '\'':
-			if singleQuote {
-				if err != nil {
-					return nil, false, err
-				}
-				return thiz.bb[i:len(thiz.bb)], singleQuote, nil
-			}
+		k := findFirstIndexOfPattern(u, p)
+		if k < n {
+			j := thiz.r.r - n
+			thiz.bb = append(thiz.bb, thiz.r.buf[j:j+k]...)
+			thiz.r.unreadBytes(n - k - 1)
+			return thiz.bb[i:len(thiz.bb)], singleQuote, nil
 		}
-		thiz.bb = append(thiz.bb, b)
+		thiz.bb = append(thiz.bb, thiz.r.buf[thiz.r.r-8:thiz.r.r]...)
 	}
+}
+
+var pSQ = compilePattern('\'')
+var pDQ = compilePattern('"')
+
+func findFirstIndexOfPattern(word, pattern uint64) int {
+	input := word ^ pattern
+	return bits.TrailingZeros64(^((input & 0x7F7F7F7F7F7F7F7F) + 0x7F7F7F7F7F7F7F7F | input | 0x7F7F7F7F7F7F7F7F)) >> 3
+}
+func compilePattern(b byte) uint64 {
+	pattern := uint64(b)
+	return pattern |
+		pattern<<8 |
+		pattern<<16 |
+		pattern<<24 |
+		pattern<<32 |
+		pattern<<40 |
+		pattern<<48 |
+		pattern<<56
 }
