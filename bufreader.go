@@ -15,8 +15,8 @@ type bufreader struct {
 func (b *bufreader) read0() error {
 	if b.r > 0 {
 		copy(b.buf[:], b.buf[b.r:b.w])
-		b.r = 0
 		b.w -= b.r
+		b.r = 0
 	}
 	n, err := b.rd.Read(b.buf[b.w:])
 	b.w += n
