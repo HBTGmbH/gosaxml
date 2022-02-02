@@ -244,7 +244,7 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 		return err
 	}
 	var attributes []Attr
-	attributes, b, err = thiz.decodeAttributes(b)
+	attributes, err = thiz.decodeAttributes(b)
 	if err != nil {
 		return err
 	}
@@ -348,23 +348,23 @@ func (thiz *decoder) readSimpleName() ([]byte, byte, error) {
 	}
 }
 
-func (thiz *decoder) decodeAttributes(b byte) ([]Attr, byte, error) {
+func (thiz *decoder) decodeAttributes(b byte) ([]Attr, error) {
 	i := len(thiz.attrs)
 	for {
 		var err error
 		b, err = thiz.skipWhitespaces(b)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		switch b {
 		case '/', '>':
-			return thiz.attrs[i:len(thiz.attrs)], b, nil
+			return thiz.attrs[i:len(thiz.attrs)], nil
 		default:
 			i := len(thiz.attrs)
 			thiz.attrs = thiz.attrs[:i+1]
-			b, err = thiz.decodeAttribute(&thiz.attrs[i])
+			err = thiz.decodeAttribute(&thiz.attrs[i])
 			if err != nil {
-				return nil, 0, err
+				return nil, err
 			}
 			b, err = thiz.r.readByte()
 			thiz.numAttributes[thiz.top]++
@@ -376,30 +376,30 @@ func (thiz *decoder) decodeAttributes(b byte) ([]Attr, byte, error) {
 // After this function returns, the next reader symbol
 // is the byte after the closing single or double quote
 // of the attribute's value.
-func (thiz *decoder) decodeAttribute(attr *Attr) (byte, error) {
+func (thiz *decoder) decodeAttribute(attr *Attr) error {
 	thiz.r.unreadByte()
 	name, b, err := thiz.readName()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	b, err = thiz.skipWhitespaces(b)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	if b != '=' {
-		return 0, fmt.Errorf("expected '=' character following attribute %+v", name)
+		return fmt.Errorf("expected '=' character following attribute %+v", name)
 	}
 	b, err = thiz.r.readByte()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	b, err = thiz.skipWhitespaces(b)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	value, singleQuote, err := thiz.readString(b)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	// xml:space?
 	if bytes.Equal(name.Prefix, bs("xml")) && bytes.Equal(name.Local, bs("space")) {
@@ -408,7 +408,7 @@ func (thiz *decoder) decodeAttribute(attr *Attr) (byte, error) {
 	attr.Name = name
 	attr.SingleQuote = singleQuote
 	attr.Value = value
-	return b, nil
+	return nil
 }
 
 // readString parses a single string (in single or double quotes)
