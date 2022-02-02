@@ -22,14 +22,16 @@ type Decoder interface {
 }
 
 type decoder struct {
+	rb                  [2048]byte
 	bbOffset            [256]int32
 	numAttributes       [256]byte
 	lastOpen            Name
 	preserveWhitespaces [32]bool
-	r                   bufreader
+	rd                  io.Reader
 	bb                  []byte
 	attrs               []Attr
-	buf                 [8]byte
+	r                   int
+	w                   int
 	read                byte
 	write               byte
 	top                 byte
@@ -38,9 +40,7 @@ type decoder struct {
 // NewDecoder creates a new Decoder.
 func NewDecoder(r io.Reader) Decoder {
 	return &decoder{
-		r: bufreader{
-			rd: r,
-		},
+		rd:    r,
 		bb:    make([]byte, 0, 256),
 		attrs: make([]Attr, 0, 256),
 	}
@@ -50,8 +50,55 @@ func isWhitespace(b byte) bool {
 	return b == '\t' || b == '\n' || b == '\r' || b == ' '
 }
 
+func (thiz *decoder) read0() error {
+	if thiz.r > 0 {
+		copy(thiz.rb[:], thiz.rb[thiz.r:thiz.w])
+		thiz.w -= thiz.r
+		thiz.r = 0
+	}
+	n, err := thiz.rd.Read(thiz.rb[thiz.w:])
+	thiz.w += n
+	if n <= 0 && err != nil {
+		return err
+	}
+	return nil
+}
+
+func (thiz *decoder) unreadByte() {
+	thiz.r--
+}
+
+func (thiz *decoder) readByte() (byte, error) {
+	for thiz.r == thiz.w {
+		err := thiz.read0()
+		if err != nil {
+			return 0, err
+		}
+	}
+	c := thiz.rb[thiz.r]
+	thiz.r++
+	return c, nil
+}
+
+func (thiz *decoder) discardBuffer() {
+	thiz.r = thiz.w
+}
+
+func (thiz *decoder) discard(n int) (int, error) {
+	for thiz.r+n > thiz.w {
+		err := thiz.read0()
+		if err != nil {
+			return 0, err
+		}
+	}
+	thiz.r += n
+	return n, nil
+}
+
 func (thiz *decoder) Reset(r io.Reader) {
-	thiz.r.reset(r)
+	thiz.rd = r
+	thiz.r = 0
+	thiz.w = 0
 	thiz.attrs = thiz.attrs[:0]
 	thiz.bb = thiz.bb[:0]
 	thiz.top = 0
@@ -63,7 +110,7 @@ func (thiz *decoder) skipWhitespaces(b byte) (byte, error) {
 			return b, nil
 		}
 		var err error
-		b, err = thiz.r.readByte()
+		b, err = thiz.readByte()
 		if err != nil {
 			return 0, err
 		}
@@ -73,7 +120,7 @@ func (thiz *decoder) skipWhitespaces(b byte) (byte, error) {
 func (thiz *decoder) NextToken(t *Token) error {
 	for {
 		// read next character
-		b, err := thiz.r.readByte()
+		b, err := thiz.readByte()
 		if err != nil {
 			return err
 		}
@@ -87,24 +134,24 @@ func (thiz *decoder) NextToken(t *Token) error {
 			// Immediately closing last openend StartElement.
 			// This will generate an EndElement with the same
 			// name that we used in the previous StartElement.
-			_, err = thiz.r.discard(1)
+			_, err = thiz.discard(1)
 			if err != nil {
 				return err
 			}
 			return thiz.decodeEndElement(t, thiz.lastOpen)
 		case '<':
-			b, err = thiz.r.readByte()
+			b, err = thiz.readByte()
 			if err != nil {
 				return err
 			}
 			switch b {
 			case '?':
 				err = thiz.decodeProcInst(t)
-				thiz.r.unreadByte()
+				thiz.unreadByte()
 				return err
 			case '!':
 				// CDATA or comment
-				b, err = thiz.r.readByte()
+				b, err = thiz.readByte()
 				if err != nil {
 					return err
 				}
@@ -130,7 +177,7 @@ func (thiz *decoder) NextToken(t *Token) error {
 				return thiz.decodeStartElement(t)
 			}
 		default:
-			thiz.r.unreadByte()
+			thiz.unreadByte()
 			cntn, err := thiz.decodeText(t)
 			if err != nil || !cntn {
 				return err
@@ -154,7 +201,7 @@ func (thiz *decoder) decodeProcInst(t *Token) error {
 		if b == '?' {
 			for {
 				var b2 byte
-				b2, err = thiz.r.readByte()
+				b2, err = thiz.readByte()
 				if err != nil {
 					return err
 				}
@@ -181,7 +228,7 @@ func (thiz *decoder) decodeProcInst(t *Token) error {
 				j = len(thiz.bb)
 			}
 		}
-		b, err = thiz.r.readByte()
+		b, err = thiz.readByte()
 		if err != nil {
 			return err
 		}
@@ -189,26 +236,26 @@ func (thiz *decoder) decodeProcInst(t *Token) error {
 }
 
 func (thiz *decoder) ignoreComment() error {
-	_, err := thiz.r.discard(1)
+	_, err := thiz.discard(1)
 	if err != nil {
 		return err
 	}
 	for {
 		var b byte
-		b, err = thiz.r.readByte()
+		b, err = thiz.readByte()
 		if err != nil {
 			return err
 		}
 		if b == '-' {
 			var b2 byte
-			b2, err = thiz.r.readByte()
+			b2, err = thiz.readByte()
 			if err != nil {
 				return err
 			}
 			if b2 == '-' {
 				for {
 					var b3 byte
-					b3, err = thiz.r.readByte()
+					b3, err = thiz.readByte()
 					if err != nil {
 						return err
 					}
@@ -238,7 +285,7 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 	thiz.numAttributes[thiz.top] = 0
 	thiz.bbOffset[thiz.top] = int32(len(thiz.bb))
 	thiz.preserveWhitespaces[thiz.top+1] = thiz.preserveWhitespaces[thiz.top]
-	thiz.r.unreadByte()
+	thiz.unreadByte()
 	name, b, err := thiz.readName()
 	if err != nil {
 		return err
@@ -252,7 +299,7 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 	t.Kind = TokenTypeStartElement
 	t.Name = name
 	t.Attr = attributes
-	thiz.r.unreadByte()
+	thiz.unreadByte()
 	return nil
 }
 
@@ -260,27 +307,36 @@ func (thiz *decoder) decodeText(t *Token) (bool, error) {
 	i := len(thiz.bb)
 	onlyWhitespaces := true
 	for {
-		b, err := thiz.r.readByte()
+		j := thiz.r
+		for k := j; k < thiz.w; k++ {
+			b := thiz.rb[k]
+			if b == '<' {
+				_, err := thiz.discard(k - j)
+				if err != nil {
+					return false, err
+				}
+				if onlyWhitespaces && !thiz.preserveWhitespaces[thiz.top] {
+					return true, nil
+				}
+				thiz.bb = append(thiz.bb, thiz.rb[j:k]...)
+				t.Kind = TokenTypeTextElement
+				t.ByteData = thiz.bb[i:len(thiz.bb)]
+				return false, nil
+			}
+			onlyWhitespaces = onlyWhitespaces && isWhitespace(b)
+		}
+		thiz.bb = append(thiz.bb, thiz.rb[j:thiz.w]...)
+		thiz.discardBuffer()
+		err := thiz.read0()
 		if err != nil {
 			return false, err
 		}
-		if b == '<' {
-			thiz.r.unreadByte()
-			if onlyWhitespaces && !thiz.preserveWhitespaces[thiz.top] {
-				return true, nil
-			}
-			t.Kind = TokenTypeTextElement
-			t.ByteData = thiz.bb[i:len(thiz.bb)]
-			return false, nil
-		}
-		onlyWhitespaces = onlyWhitespaces && isWhitespace(b)
-		thiz.bb = append(thiz.bb, b)
 	}
 }
 
 func (thiz *decoder) readCDATA() error {
 	// discard "CDATA["
-	_, err := thiz.r.discard(6)
+	_, err := thiz.discard(6)
 	if err != nil {
 		return err
 	}
@@ -330,20 +386,20 @@ func isSeparator(b byte) bool {
 func (thiz *decoder) readSimpleName() ([]byte, byte, error) {
 	i := len(thiz.bb)
 	for {
-		j := thiz.r.r
-		for k := j; k < thiz.r.w; k++ {
-			if isSeparator(thiz.r.buf[k]) {
-				thiz.bb = append(thiz.bb, thiz.r.buf[j:k]...)
-				_, err := thiz.r.discard(k - j + 1)
+		j := thiz.r
+		for k := j; k < thiz.w; k++ {
+			if isSeparator(thiz.rb[k]) {
+				thiz.bb = append(thiz.bb, thiz.rb[j:k]...)
+				_, err := thiz.discard(k - j + 1)
 				if err != nil {
 					return nil, 0, err
 				}
-				return thiz.bb[i:len(thiz.bb)], thiz.r.buf[k], nil
+				return thiz.bb[i:len(thiz.bb)], thiz.rb[k], nil
 			}
 		}
-		thiz.bb = append(thiz.bb, thiz.r.buf[thiz.r.r:thiz.r.w]...)
-		thiz.r.discardBuffer()
-		err := thiz.r.read0()
+		thiz.bb = append(thiz.bb, thiz.rb[j:thiz.w]...)
+		thiz.discardBuffer()
+		err := thiz.read0()
 		if err != nil {
 			return nil, 0, err
 		}
@@ -368,7 +424,7 @@ func (thiz *decoder) decodeAttributes(b byte) ([]Attr, error) {
 			if err != nil {
 				return nil, err
 			}
-			b, err = thiz.r.readByte()
+			b, err = thiz.readByte()
 			thiz.numAttributes[thiz.top]++
 		}
 	}
@@ -379,7 +435,7 @@ func (thiz *decoder) decodeAttributes(b byte) ([]Attr, error) {
 // is the byte after the closing single or double quote
 // of the attribute's value.
 func (thiz *decoder) decodeAttribute(attr *Attr) error {
-	thiz.r.unreadByte()
+	thiz.unreadByte()
 	name, b, err := thiz.readName()
 	if err != nil {
 		return err
@@ -391,7 +447,7 @@ func (thiz *decoder) decodeAttribute(attr *Attr) error {
 	if b != '=' {
 		return fmt.Errorf("expected '=' character following attribute %+v", name)
 	}
-	b, err = thiz.r.readByte()
+	b, err = thiz.readByte()
 	if err != nil {
 		return err
 	}
@@ -418,19 +474,19 @@ func (thiz *decoder) readString(b byte) ([]byte, bool, error) {
 	i := len(thiz.bb)
 	singleQuote := b == '\''
 	for {
-		j := thiz.r.r
-		k := bytes.IndexByte(thiz.r.buf[j:thiz.r.w], b)
+		j := thiz.r
+		k := bytes.IndexByte(thiz.rb[j:thiz.w], b)
 		if k > -1 {
-			thiz.bb = append(thiz.bb, thiz.r.buf[j:j+k]...)
-			_, err := thiz.r.discard(k + 1)
+			thiz.bb = append(thiz.bb, thiz.rb[j:j+k]...)
+			_, err := thiz.discard(k + 1)
 			if err != nil {
 				return nil, false, err
 			}
 			return thiz.bb[i:len(thiz.bb)], singleQuote, nil
 		}
-		thiz.bb = append(thiz.bb, thiz.r.buf[thiz.r.r:thiz.r.w]...)
-		thiz.r.discardBuffer()
-		err := thiz.r.read0()
+		thiz.bb = append(thiz.bb, thiz.rb[j:thiz.w]...)
+		thiz.discardBuffer()
+		err := thiz.read0()
 		if err != nil {
 			return nil, false, err
 		}
