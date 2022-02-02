@@ -282,32 +282,30 @@ func (thiz *decoder) readCDATA() error {
 }
 
 func (thiz *decoder) readName() (Name, error) {
-	for {
-		localOrPrefix, err := thiz.readSimpleName()
+	localOrPrefix, err := thiz.readSimpleName()
+	if err != nil {
+		return Name{}, err
+	}
+	b, err := thiz.r.readByte()
+	if err != nil {
+		return Name{}, err
+	}
+	if b == ':' {
+		local, err := thiz.readSimpleName()
 		if err != nil {
 			return Name{}, err
 		}
-		b, err := thiz.r.readByte()
-		if err != nil {
-			return Name{}, err
-		}
-		if b == ':' {
-			local, err := thiz.readSimpleName()
-			if err != nil {
-				return Name{}, err
-			}
-			return Name{
-				Local:  local,
-				Prefix: localOrPrefix,
-			}, nil
-		} else if isSeparator(b) {
-			thiz.r.unreadByte()
-			return Name{
-				Local: localOrPrefix,
-			}, nil
-		} else {
-			return Name{}, errors.New("reached here unexpectedly")
-		}
+		return Name{
+			Local:  local,
+			Prefix: localOrPrefix,
+		}, nil
+	} else if isSeparator(b) {
+		thiz.r.unreadByte()
+		return Name{
+			Local: localOrPrefix,
+		}, nil
+	} else {
+		return Name{}, errors.New("reached here unexpectedly")
 	}
 }
 
