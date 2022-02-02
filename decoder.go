@@ -120,21 +120,14 @@ func (thiz *decoder) NextToken(t *Token) error {
 					return errors.New("invalid XML: comment or CDATA expected")
 				}
 			case '/':
-				b, err = thiz.r.readByte()
-				if err != nil {
-					return err
-				}
 				var name Name
-				name, _, err = thiz.readName(b)
+				name, _, err = thiz.readName()
 				if err != nil {
 					return err
 				}
-				thiz.r.unreadByte()
 				return thiz.decodeEndElement(t, name)
 			default:
-				_, err = thiz.decodeStartElement(b, t)
-				thiz.r.unreadByte()
-				return err
+				return thiz.decodeStartElement(t)
 			}
 		default:
 			thiz.r.unreadByte()
@@ -147,12 +140,7 @@ func (thiz *decoder) NextToken(t *Token) error {
 }
 
 func (thiz *decoder) decodeProcInst(t *Token) error {
-	b, err := thiz.r.readByte()
-	if err != nil {
-		return err
-	}
-	var name Name
-	name, b, err = thiz.readName(b)
+	name, b, err := thiz.readName()
 	if err != nil {
 		return err
 	}
@@ -245,27 +233,27 @@ func (thiz *decoder) decodeEndElement(t *Token, name Name) error {
 	return nil
 }
 
-func (thiz *decoder) decodeStartElement(b byte, t *Token) (byte, error) {
+func (thiz *decoder) decodeStartElement(t *Token) error {
 	thiz.top++
 	thiz.numAttributes[thiz.top] = 0
 	thiz.bbOffset[thiz.top] = int32(len(thiz.bb))
 	thiz.preserveWhitespaces[thiz.top+1] = thiz.preserveWhitespaces[thiz.top]
-	var name Name
-	var err error
-	name, b, err = thiz.readName(b)
+	thiz.r.unreadByte()
+	name, b, err := thiz.readName()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	var attributes []Attr
 	attributes, b, err = thiz.decodeAttributes(b)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	thiz.lastOpen = name
 	t.Kind = TokenTypeStartElement
 	t.Name = name
 	t.Attr = attributes
-	return b, nil
+	thiz.r.unreadByte()
+	return nil
 }
 
 func (thiz *decoder) decodeText(t *Token) (bool, error) {
@@ -299,20 +287,14 @@ func (thiz *decoder) readCDATA() error {
 	return errors.New("NYI")
 }
 
-func (thiz *decoder) readName(b byte) (Name, byte, error) {
-	var localOrPrefix []byte
-	var err error
-	localOrPrefix, b, err = thiz.readSimpleName(b)
+func (thiz *decoder) readName() (Name, byte, error) {
+	localOrPrefix, b, err := thiz.readSimpleName()
 	if err != nil {
 		return Name{}, 0, err
 	}
 	if b == ':' {
-		b, err = thiz.r.readByte()
-		if err != nil {
-			return Name{}, 0, err
-		}
 		var local []byte
-		local, b, err = thiz.readSimpleName(b)
+		local, b, err = thiz.readSimpleName()
 		if err != nil {
 			return Name{}, 0, err
 		}
@@ -345,15 +327,21 @@ func isSeparator(b byte) bool {
 	return int(b) < len(seps) && seps[b]
 }
 
-func (thiz *decoder) readSimpleName(b byte) ([]byte, byte, error) {
+func (thiz *decoder) readSimpleName() ([]byte, byte, error) {
 	i := len(thiz.bb)
 	for {
-		var err error
-		if isSeparator(b) {
-			return thiz.bb[i:len(thiz.bb)], b, nil
+		j := thiz.r.r
+		for k := j; k < thiz.r.w; k++ {
+			if isSeparator(thiz.r.buf[k]) {
+				thiz.bb = append(thiz.bb, thiz.r.buf[j:k]...)
+				_, err := thiz.r.discard(k - j + 1)
+				if err != nil {
+					return nil, 0, err
+				}
+				return thiz.bb[i:len(thiz.bb)], thiz.r.buf[k], nil
+			}
 		}
-		thiz.bb = append(thiz.bb, b)
-		b, err = thiz.r.readByte()
+		err := thiz.r.read0()
 		if err != nil {
 			return nil, 0, err
 		}
@@ -374,7 +362,7 @@ func (thiz *decoder) decodeAttributes(b byte) ([]Attr, byte, error) {
 		default:
 			i := len(thiz.attrs)
 			thiz.attrs = thiz.attrs[:i+1]
-			b, err = thiz.decodeAttribute(b, &thiz.attrs[i])
+			b, err = thiz.decodeAttribute(&thiz.attrs[i])
 			if err != nil {
 				return nil, 0, err
 			}
@@ -388,10 +376,9 @@ func (thiz *decoder) decodeAttributes(b byte) ([]Attr, byte, error) {
 // After this function returns, the next reader symbol
 // is the byte after the closing single or double quote
 // of the attribute's value.
-func (thiz *decoder) decodeAttribute(b byte, attr *Attr) (byte, error) {
-	var name Name
-	var err error
-	name, b, err = thiz.readName(b)
+func (thiz *decoder) decodeAttribute(attr *Attr) (byte, error) {
+	thiz.r.unreadByte()
+	name, b, err := thiz.readName()
 	if err != nil {
 		return 0, err
 	}
@@ -440,8 +427,11 @@ func (thiz *decoder) readString(b byte) ([]byte, bool, error) {
 			return thiz.bb[i:len(thiz.bb)], singleQuote, nil
 		}
 		thiz.bb = append(thiz.bb, thiz.r.buf[thiz.r.r:thiz.r.w]...)
-		thiz.r.discardBuffer()
-		err := thiz.r.read0()
+		_, err := thiz.r.discard(thiz.r.w - j)
+		if err != nil {
+			return nil, false, err
+		}
+		err = thiz.r.read0()
 		if err != nil {
 			return nil, false, err
 		}
