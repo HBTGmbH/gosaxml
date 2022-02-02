@@ -65,6 +65,10 @@ func (b *bufreader) reset(r io.Reader) {
 	b.w = 0
 }
 
+func (b *bufreader) discardBuffer() {
+	b.r = b.w
+}
+
 func (b *bufreader) discard(n int) (int, error) {
 	for b.r+n > b.w {
 		err := b.read0()

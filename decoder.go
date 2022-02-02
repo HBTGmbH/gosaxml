@@ -440,6 +440,7 @@ func (thiz *decoder) readString(b byte) ([]byte, bool, error) {
 			return thiz.bb[i:len(thiz.bb)], singleQuote, nil
 		}
 		thiz.bb = append(thiz.bb, thiz.r.buf[thiz.r.r:thiz.r.w]...)
+		thiz.r.discardBuffer()
 		err := thiz.r.read0()
 		if err != nil {
 			return nil, false, err
