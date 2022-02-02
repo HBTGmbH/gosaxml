@@ -341,6 +341,8 @@ func (thiz *decoder) readSimpleName() ([]byte, byte, error) {
 				return thiz.bb[i:len(thiz.bb)], thiz.r.buf[k], nil
 			}
 		}
+		thiz.bb = append(thiz.bb, thiz.r.buf[thiz.r.r:thiz.r.w]...)
+		thiz.r.discardBuffer()
 		err := thiz.r.read0()
 		if err != nil {
 			return nil, 0, err
@@ -427,11 +429,8 @@ func (thiz *decoder) readString(b byte) ([]byte, bool, error) {
 			return thiz.bb[i:len(thiz.bb)], singleQuote, nil
 		}
 		thiz.bb = append(thiz.bb, thiz.r.buf[thiz.r.r:thiz.r.w]...)
-		_, err := thiz.r.discard(thiz.r.w - j)
-		if err != nil {
-			return nil, false, err
-		}
-		err = thiz.r.read0()
+		thiz.r.discardBuffer()
+		err := thiz.r.read0()
 		if err != nil {
 			return nil, false, err
 		}
