@@ -65,10 +65,7 @@ func (thiz *decoder) skipWhitespaces() error {
 			return err
 		}
 		if !isWhitespace(b) {
-			err = thiz.r.unreadByte()
-			if err != nil {
-				return err
-			}
+			thiz.r.unreadByte()
 			return nil
 		}
 	}
@@ -130,17 +127,11 @@ func (thiz *decoder) NextToken(t *Token) error {
 				}
 				return thiz.decodeEndElement(t, name)
 			default:
-				err = thiz.r.unreadByte()
-				if err != nil {
-					return err
-				}
+				thiz.r.unreadByte()
 				return thiz.decodeStartElement(t)
 			}
 		default:
-			err = thiz.r.unreadByte()
-			if err != nil {
-				return err
-			}
+			thiz.r.unreadByte()
 			cntn, err := thiz.decodeText(t)
 			if err != nil || !cntn {
 				return err
@@ -267,22 +258,17 @@ func (thiz *decoder) decodeText(t *Token) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		switch b {
-		case '<':
-			err = thiz.r.unreadByte()
-			if err != nil {
-				return false, err
-			}
+		if b == '<' {
+			thiz.r.unreadByte()
 			if onlyWhitespaces && !thiz.preserveWhitespaces[thiz.top] {
 				return true, nil
 			}
 			t.Kind = TokenTypeTextElement
 			t.ByteData = thiz.bb[i:len(thiz.bb)]
 			return false, nil
-		default:
-			onlyWhitespaces = onlyWhitespaces && isWhitespace(b)
-			thiz.bb = append(thiz.bb, b)
 		}
+		onlyWhitespaces = onlyWhitespaces && isWhitespace(b)
+		thiz.bb = append(thiz.bb, b)
 	}
 }
 
@@ -305,8 +291,7 @@ func (thiz *decoder) readName() (Name, error) {
 		if err != nil {
 			return Name{}, err
 		}
-		switch b {
-		case ':':
+		if b == ':' {
 			local, err := thiz.readSimpleName()
 			if err != nil {
 				return Name{}, err
@@ -315,18 +300,34 @@ func (thiz *decoder) readName() (Name, error) {
 				Local:  local,
 				Prefix: localOrPrefix,
 			}, nil
-		case '\t', '\n', '\r', ' ', '/', '=', '>':
-			err = thiz.r.unreadByte()
-			if err != nil {
-				return Name{}, err
-			}
+		} else if isSeparator(b) {
+			thiz.r.unreadByte()
 			return Name{
 				Local: localOrPrefix,
 			}, nil
-		default:
+		} else {
 			return Name{}, errors.New("reached here unexpectedly")
 		}
 	}
+}
+
+var seps = generateTable()
+
+func generateTable() ['>' + 1]bool {
+	var s ['>' + 1]bool
+	s['\t'] = true
+	s['\n'] = true
+	s['\r'] = true
+	s[' '] = true
+	s['/'] = true
+	s[':'] = true
+	s['='] = true
+	s['>'] = true
+	return s
+}
+
+func isSeparator(b byte) bool {
+	return int(b) < len(seps) && seps[b]
 }
 
 func (thiz *decoder) readSimpleName() ([]byte, error) {
@@ -336,16 +337,11 @@ func (thiz *decoder) readSimpleName() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		switch b {
-		case '\t', '\n', '\r', ' ', '/', ':', '=', '>':
-			err = thiz.r.unreadByte()
-			if err != nil {
-				return nil, err
-			}
+		if isSeparator(b) {
+			thiz.r.unreadByte()
 			return thiz.bb[i:len(thiz.bb)], nil
-		default:
-			thiz.bb = append(thiz.bb, b)
 		}
+		thiz.bb = append(thiz.bb, b)
 	}
 }
 
@@ -362,16 +358,10 @@ func (thiz *decoder) decodeAttributes() ([]Attr, error) {
 		}
 		switch b {
 		case '/', '>':
-			err = thiz.r.unreadByte()
-			if err != nil {
-				return nil, err
-			}
+			thiz.r.unreadByte()
 			return thiz.attrs[i:len(thiz.attrs)], nil
 		default:
-			err = thiz.r.unreadByte()
-			if err != nil {
-				return nil, err
-			}
+			thiz.r.unreadByte()
 			i := len(thiz.attrs)
 			thiz.attrs = thiz.attrs[:i+1]
 			err := thiz.decodeAttribute(&thiz.attrs[i])

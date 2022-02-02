@@ -2,7 +2,6 @@ package gosaxml
 
 import (
 	"encoding/binary"
-	"errors"
 	"io"
 )
 
@@ -39,12 +38,8 @@ func (b *bufreader) readByte() (byte, error) {
 	return c, nil
 }
 
-func (b *bufreader) unreadByte() error {
-	if b.r == 0 {
-		return errors.New("cannot perform unread")
-	}
+func (b *bufreader) unreadByte() {
 	b.r--
-	return nil
 }
 
 func (b *bufreader) unreadBytes(n int) {
