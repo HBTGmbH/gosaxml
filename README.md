@@ -48,6 +48,7 @@ func TestDecodeAndEncode(t *testing.T) {
 		err = enc.EncodeToken(&tk)
 		assert.Nil(t, err)
 	}
+	assert.Nil(t, enc.Flush())
 
 	// then
 	assert.Equal(t,

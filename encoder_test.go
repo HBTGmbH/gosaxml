@@ -91,6 +91,7 @@ func TestEncodeStartElement(t *testing.T) {
 			Value: []byte("https://mynamespace"),
 		}},
 	})
+	assert.Nil(t, enc.Flush())
 
 	// then
 	assert.Nil(t, err)
@@ -157,6 +158,7 @@ func TestEncodeStartElementEndElement(t *testing.T) {
 			Value: []byte("https://mynamespace"),
 		}},
 	})
+	assert.Nil(t, enc.Flush())
 
 	// then
 	assert.Nil(t, err1)
@@ -199,6 +201,7 @@ func TestEncodeTwoNestedWithRedundantNamespace(t *testing.T) {
 			Value: []byte("https://mynamespace"),
 		}},
 	})
+	assert.Nil(t, enc.Flush())
 
 	// then
 	assert.Nil(t, err1)
@@ -236,6 +239,7 @@ func TestEncodeTwoNestedWithRedundantNamespaceUnprefixed(t *testing.T) {
 			Value: []byte("https://mynamespace"),
 		}},
 	})
+	assert.Nil(t, enc.Flush())
 
 	// then
 	assert.Nil(t, err1)

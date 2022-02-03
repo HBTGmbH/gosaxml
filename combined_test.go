@@ -30,6 +30,7 @@ func BenchmarkNamespaceAlias1Level(b *testing.B) {
 			err = enc.EncodeToken(&tk)
 			assert.Nil(b, err)
 		}
+		assert.Nil(b, enc.Flush())
 	}
 }
 
@@ -104,6 +105,7 @@ func BenchmarkSameNamespaceSideBySide(b *testing.B) {
 			err = enc.EncodeToken(&tk)
 			assert.Nil(b, err)
 		}
+		assert.Nil(b, enc.Flush())
 	}
 }
 
@@ -414,4 +416,5 @@ func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *g
 		err = enc.EncodeToken(tk)
 		assert.Nil(t, err)
 	}
+	assert.Nil(t, enc.Flush())
 }

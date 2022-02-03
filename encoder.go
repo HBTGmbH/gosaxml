@@ -14,17 +14,10 @@ const (
 
 // pre-allocate all constant byte slices that we write
 var (
-	angleOpen       = bs("<")
-	angleClose      = bs(">")
 	slashAngleClose = bs("/>")
 	angleOpenSlash  = bs("</")
-	space           = bs(" ")
-	equal           = bs("=")
 	angleOpenQuest  = bs("<?")
 	questAngleClose = bs("?>")
-	colon           = bs(":")
-	singleQuote     = bs("'")
-	doubleQuote     = bs("\"")
 )
 
 // EncoderMiddleware allows to pre-process a Token before
@@ -50,11 +43,17 @@ type EncoderMiddleware interface {
 
 // Encoder encodes Token values to an io.Writer.
 type Encoder struct {
+	// buffers writes to the underlying io.Writer
+	buf [2048]byte
+
 	// middlewares can modify encoded tokens before encoding.
 	middlewares []EncoderMiddleware
 
 	// The io.Writer we encode/write into.
-	w io.Writer
+	wr io.Writer
+
+	// the current write position into buf
+	w int
 
 	// Whether the last token was of type TokenTypeStartElement.
 	// This is used to delay encoding the ending ">" or "/>" string
@@ -65,15 +64,50 @@ type Encoder struct {
 // NewEncoder creates a new Encoder with the given middlewares and returns a pointer to it.
 func NewEncoder(w io.Writer, middlewares ...EncoderMiddleware) *Encoder {
 	return &Encoder{
-		w:           w,
+		wr:          w,
 		middlewares: middlewares,
 	}
+}
+
+// Flush writes all buffered output into the io.Writer.
+// It must be called after token encoding is done in order
+// to write all remaining bytes into the io.Writer.
+func (thiz *Encoder) Flush() error {
+	_, err := thiz.wr.Write(thiz.buf[:thiz.w])
+	thiz.w = 0
+	return err
+}
+
+func (thiz *Encoder) write(b byte) error {
+	if thiz.w >= len(thiz.buf) {
+		err := thiz.Flush()
+		if err != nil {
+			return err
+		}
+	}
+	thiz.buf[thiz.w] = b
+	thiz.w++
+	return nil
+}
+
+func (thiz *Encoder) writeBytes(bs []byte) error {
+	l := len(bs)
+	if thiz.w+l > len(thiz.buf) {
+		err := thiz.Flush()
+		if err != nil {
+			return err
+		}
+	}
+	copy(thiz.buf[thiz.w:], bs)
+	thiz.w += l
+	return nil
 }
 
 // Reset resets this Encoder to write into the provided io.Writer
 // and resets all middlewares.
 func (thiz *Encoder) Reset(w io.Writer) {
-	thiz.w = w
+	thiz.wr = w
+	thiz.w = 0
 	thiz.lastStartElement = false
 	for _, middleware := range thiz.middlewares {
 		middleware.Reset()
@@ -127,7 +161,7 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(angleOpen)
+	err = thiz.write('<')
 	if err != nil {
 		return err
 	}
@@ -146,7 +180,7 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 	// write attributes
 	for i := 0; i < len(t.Attr); i++ {
 		attr := &t.Attr[i]
-		_, err = thiz.w.Write(space)
+		err = thiz.write(' ')
 		if err != nil {
 			return err
 		}
@@ -154,7 +188,7 @@ func (thiz *Encoder) encodeStartElement(t *Token) error {
 		if err != nil {
 			return err
 		}
-		_, err = thiz.w.Write(equal)
+		err = thiz.write('=')
 		if err != nil {
 			return err
 		}
@@ -174,7 +208,7 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if thiz.lastStartElement {
 		// the last seen token was a StartElement, so this
 		// token can only be its accompanying EndElement.
-		_, err := thiz.w.Write(slashAngleClose)
+		err := thiz.writeBytes(slashAngleClose)
 		if err != nil {
 			return err
 		}
@@ -185,7 +219,7 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(angleOpenSlash)
+	err = thiz.writeBytes(angleOpenSlash)
 	if err != nil {
 		return err
 	}
@@ -193,7 +227,7 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(angleClose)
+	err = thiz.write('>')
 	if err != nil {
 		return err
 	}
@@ -203,7 +237,7 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 func (thiz *Encoder) callMiddlewares(t *Token) error {
 	var err error
 	for _, middleware := range thiz.middlewares {
-		err = middleware.EncodeToken((*Token)(noescape(unsafe.Pointer(t))))
+		err = middleware.EncodeToken(t)
 		if err != nil {
 			return err
 		}
@@ -211,43 +245,39 @@ func (thiz *Encoder) callMiddlewares(t *Token) error {
 	return nil
 }
 
-func (thiz Encoder) writeName(n Name) error {
+func (thiz *Encoder) writeName(n Name) error {
 	var err error
 	if n.Prefix != nil {
-		_, err = thiz.w.Write(n.Prefix)
+		err = thiz.writeBytes(n.Prefix)
 		if err != nil {
 			return err
 		}
-		_, err = thiz.w.Write(colon)
+		err = thiz.write(':')
 		if err != nil {
 			return err
 		}
 	}
-	_, err = thiz.w.Write(n.Local)
-	if err != nil {
-		return err
-	}
-	return nil
+	return thiz.writeBytes(n.Local)
 }
 
-func (thiz Encoder) writeString(s []byte, useSingleQuote bool) error {
+func (thiz *Encoder) writeString(s []byte, useSingleQuote bool) error {
 	var err error
 	if useSingleQuote {
-		_, err = thiz.w.Write(singleQuote)
+		err = thiz.write('\'')
 	} else {
-		_, err = thiz.w.Write(doubleQuote)
+		err = thiz.write('"')
 	}
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(s)
+	err = thiz.writeBytes(s)
 	if err != nil {
 		return err
 	}
 	if useSingleQuote {
-		_, err = thiz.w.Write(singleQuote)
+		err = thiz.write('\'')
 	} else {
-		_, err = thiz.w.Write(doubleQuote)
+		err = thiz.write('"')
 	}
 	return err
 }
@@ -257,14 +287,13 @@ func (thiz *Encoder) encodeTextElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(t.ByteData)
-	return err
+	return thiz.writeBytes(t.ByteData)
 }
 
 func (thiz *Encoder) endLastStartElement() error {
 	if thiz.lastStartElement {
 		// end the last StartElement with its ">"
-		_, err := thiz.w.Write(angleClose)
+		err := thiz.write('>')
 		if err != nil {
 			return err
 		}
@@ -277,8 +306,7 @@ func (thiz *Encoder) encodeDirective(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(t.ByteData)
-	return err
+	return thiz.writeBytes(t.ByteData)
 }
 
 func (thiz *Encoder) encodeProcInst(t *Token) error {
@@ -286,7 +314,7 @@ func (thiz *Encoder) encodeProcInst(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(angleOpenQuest)
+	err = thiz.writeBytes(angleOpenQuest)
 	if err != nil {
 		return err
 	}
@@ -294,15 +322,15 @@ func (thiz *Encoder) encodeProcInst(t *Token) error {
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(space)
+	err = thiz.write(' ')
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(t.ByteData)
+	err = thiz.writeBytes(t.ByteData)
 	if err != nil {
 		return err
 	}
-	_, err = thiz.w.Write(questAngleClose)
+	err = thiz.writeBytes(questAngleClose)
 	return err
 }
 
@@ -311,12 +339,4 @@ func bs(s string) []byte {
 	return (*[0x7fff0000]byte)(unsafe.Pointer(
 		(*reflect.StringHeader)(unsafe.Pointer(&s)).Data),
 	)[:len(s):len(s)]
-}
-
-// https://go.googlesource.com/go/+/go1.17.6/src/runtime/stubs.go#164
-//go:nosplit
-func noescape(p unsafe.Pointer) unsafe.Pointer {
-	x := uintptr(p)
-	//goland:noinspection ALL
-	return unsafe.Pointer(x)
 }
