@@ -35,6 +35,7 @@ type decoder struct {
 	read                byte
 	write               byte
 	top                 byte
+	lastStartElement    bool
 }
 
 // NewDecoder creates a new Decoder.
@@ -130,15 +131,24 @@ func (thiz *decoder) NextToken(t *Token) error {
 			// That's fine. We just did not consume the end token
 			// because there could have been an implicit
 			// "/>" close at the end of the start element.
+			thiz.lastStartElement = false
 		case '/':
-			// Immediately closing last openend StartElement.
-			// This will generate an EndElement with the same
-			// name that we used in the previous StartElement.
-			_, err = thiz.discard(1)
-			if err != nil {
+			if thiz.lastStartElement {
+				// Immediately closing last openend StartElement.
+				// This will generate an EndElement with the same
+				// name that we used in the previous StartElement.
+				_, err = thiz.discard(1)
+				if err != nil {
+					return err
+				}
+				thiz.lastStartElement = false
+				return thiz.decodeEndElement(t, thiz.lastOpen)
+			}
+			thiz.unreadByte()
+			cntn, err := thiz.decodeText(t)
+			if err != nil || !cntn {
 				return err
 			}
-			return thiz.decodeEndElement(t, thiz.lastOpen)
 		case '<':
 			b, err = thiz.readByte()
 			if err != nil {
@@ -146,6 +156,7 @@ func (thiz *decoder) NextToken(t *Token) error {
 			}
 			switch b {
 			case '?':
+				thiz.lastStartElement = false
 				err = thiz.decodeProcInst(t)
 				thiz.unreadByte()
 				return err
@@ -162,6 +173,7 @@ func (thiz *decoder) NextToken(t *Token) error {
 						return err
 					}
 				case '[':
+					thiz.lastStartElement = false
 					return thiz.readCDATA()
 				default:
 					return errors.New("invalid XML: comment or CDATA expected")
@@ -172,11 +184,14 @@ func (thiz *decoder) NextToken(t *Token) error {
 				if err != nil {
 					return err
 				}
+				thiz.lastStartElement = false
 				return thiz.decodeEndElement(t, name)
 			default:
+				thiz.lastStartElement = true
 				return thiz.decodeStartElement(t)
 			}
 		default:
+			thiz.lastStartElement = false
 			thiz.unreadByte()
 			cntn, err := thiz.decodeText(t)
 			if err != nil || !cntn {
