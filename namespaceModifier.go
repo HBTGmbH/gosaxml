@@ -14,6 +14,8 @@ type NamespaceModifier struct {
 	prefixAliases [][]byte
 
 	top byte
+
+	PreserveOriginalPrefixes bool
 }
 
 // NewNamespaceModifier creates a new NamespaceModifier and returns a pointer to it.
@@ -148,13 +150,17 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 				// we don't need the attribute anymore because we already had a prefix
 				continue
 			}
-			// wo don't know the prefix, but we want to rewrite it
-			nextPrefixAlias := len(thiz.prefixAliases) / 2
-			c := namespaceAliases[nextPrefixAlias : nextPrefixAlias+1]
-			bsc := bs(c)
-			thiz.addPrefixRewrite(attr.Name.Local, bsc)
-			thiz.addNamespaceBinding(bsc, attr.Value)
-			attr.Name.Local = bsc
+			if !thiz.PreserveOriginalPrefixes {
+				// wo don't know the prefix, but we want to rewrite it
+				nextPrefixAlias := len(thiz.prefixAliases) / 2
+				c := namespaceAliases[nextPrefixAlias : nextPrefixAlias+1]
+				bsc := bs(c)
+				thiz.addPrefixRewrite(attr.Name.Local, bsc)
+				thiz.addNamespaceBinding(bsc, attr.Value)
+				attr.Name.Local = bsc
+			} else {
+				thiz.addNamespaceBinding(attr.Name.Local, attr.Value)
+			}
 		} else if attr.Name.Prefix == nil && bytes.Equal(attr.Name.Local, bs("xmlns")) {
 			// check if the element is already in that namespace, in which case
 			// we can simply omit the namespace.

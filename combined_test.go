@@ -319,6 +319,36 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
 		"</a:Envelope>", w.String())
 }
 
+func TestAttributesWithPrefixesPreserve(t *testing.T) {
+	// given
+	input := `
+<ns1:a xmlns:ns1="http://ns1" ns1:attr1="val1" ns2:attr2="val2" xmlns:ns2="http://ns2">
+<ns1:b>
+  <b:c xmlns:b="http://ns2" ns2:attr3="val3">
+    <b:d ns1:attr4="val4">Test</b:d>
+  </b:c>
+</ns1:b>
+</ns1:a>`
+	dec := gosaxml.NewDecoder(strings.NewReader(input))
+	w := &bytes.Buffer{}
+	namespaceModifier := gosaxml.NewNamespaceModifier()
+	namespaceModifier.PreserveOriginalPrefixes = true
+	enc := gosaxml.NewEncoder(w, namespaceModifier)
+	var tk gosaxml.Token
+
+	// when
+	decodeEncode(t, dec, enc, &tk)
+
+	// then
+	assert.Equal(t, "<ns1:a xmlns:ns1=\"http://ns1\" ns1:attr1=\"val1\" ns2:attr2=\"val2\" xmlns:ns2=\"http://ns2\">"+
+		"<ns1:b>"+
+		"<ns2:c ns2:attr3=\"val3\">"+
+		"<ns2:d ns1:attr4=\"val4\">Test</ns2:d>"+
+		"</ns2:c>"+
+		"</ns1:b>"+
+		"</ns1:a>", w.String())
+}
+
 func TestAttributesWithPrefixes(t *testing.T) {
 	// given
 	input := `
