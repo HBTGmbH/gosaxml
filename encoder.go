@@ -119,6 +119,8 @@ func (thiz *Encoder) Reset(w io.Writer) {
 // of this Encoder.
 func (thiz *Encoder) EncodeToken(t *Token) error {
 	switch t.Kind {
+	case TokenTypeInvalid:
+		return errors.New("trying to encode invalid/zerovalue token")
 	case TokenTypeStartElement:
 		err := thiz.encodeStartElement(t)
 		if err != nil {

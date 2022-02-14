@@ -17,7 +17,8 @@ type Attr struct {
 
 // constants for Token.Kind
 const (
-	TokenTypeStartElement = iota
+	TokenTypeInvalid = iota
+	TokenTypeStartElement
 	TokenTypeEndElement
 	TokenTypeProcInst
 	TokenTypeDirective
