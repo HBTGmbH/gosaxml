@@ -21,6 +21,10 @@ type NamespaceModifier struct {
 	PreserveOriginalPrefixes bool
 }
 
+var (
+	bsxmlns = []byte("xmlns")
+)
+
 // NewNamespaceModifier creates a new NamespaceModifier and returns a pointer to it.
 func NewNamespaceModifier() *NamespaceModifier {
 	return &NamespaceModifier{
@@ -154,7 +158,7 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 	for i := 0; i < len(t.Attr); i++ {
 		attr := &t.Attr[i]
 		// check for advertized namespaces in attributes
-		if bytes.Equal(attr.Name.Prefix, bs("xmlns")) { // <- xmlns:prefix
+		if bytes.Equal(attr.Name.Prefix, bsxmlns) { // <- xmlns:prefix
 			// this element introduces a new namespace that binds to a prefix
 			// check if we already know this namespace by this or another prefix
 			prefix := thiz.findPrefixForNamespace(attr.Value)
@@ -171,14 +175,13 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 				// wo don't know the prefix, but we want to rewrite it
 				nextPrefixAlias := len(thiz.prefixAliases) / 2
 				c := namespaceAliases[nextPrefixAlias : nextPrefixAlias+1]
-				bsc := bs(c)
-				thiz.addPrefixRewrite(attr.Name.Local, bsc)
-				thiz.addNamespaceBinding(bsc, attr.Value)
-				attr.Name.Local = bsc
+				thiz.addPrefixRewrite(attr.Name.Local, c)
+				thiz.addNamespaceBinding(c, attr.Value)
+				attr.Name.Local = c
 			} else {
 				thiz.addNamespaceBinding(attr.Name.Local, attr.Value)
 			}
-		} else if attr.Name.Prefix == nil && bytes.Equal(attr.Name.Local, bs("xmlns")) {
+		} else if attr.Name.Prefix == nil && bytes.Equal(attr.Name.Local, bsxmlns) {
 			// check if the element is already in that namespace, in which case
 			// we can simply omit the namespace.
 			currentNamespace := thiz.findNamespaceForPrefix(nil)

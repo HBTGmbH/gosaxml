@@ -3,21 +3,18 @@ package gosaxml
 import (
 	"errors"
 	"io"
-	"reflect"
-	"unsafe"
-)
-
-const (
-	// all characters used to build new namespace aliases
-	namespaceAliases = "abcdefghijklmnopqrstuvwxyz"
 )
 
 // pre-allocate all constant byte slices that we write
 var (
-	slashAngleClose = bs("/>")
-	angleOpenSlash  = bs("</")
-	angleOpenQuest  = bs("<?")
-	questAngleClose = bs("?>")
+	// all characters used to build new namespace aliases
+	namespaceAliases = []byte("abcdefghijklmnopqrstuvwxyz")
+
+	// constant strings needed here and there
+	slashAngleClose = []byte("/>")
+	angleOpenSlash  = []byte("</")
+	angleOpenQuest  = []byte("<?")
+	questAngleClose = []byte("?>")
 )
 
 // EncoderMiddleware allows to pre-process a Token before
@@ -330,11 +327,4 @@ func (thiz *Encoder) encodeProcInst(t *Token) error {
 	}
 	err = thiz.writeBytes(questAngleClose)
 	return err
-}
-
-// https://stackoverflow.com/questions/59209493/how-to-use-unsafe-get-a-byte-slice-from-a-string-without-memory-copy#answer-59210739
-func bs(s string) []byte {
-	return (*[0x7fff0000]byte)(unsafe.Pointer(
-		(*reflect.StringHeader)(unsafe.Pointer(&s)).Data),
-	)[:len(s):len(s)]
 }

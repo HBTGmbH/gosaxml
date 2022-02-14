@@ -36,6 +36,12 @@ type decoder struct {
 	lastStartElement    bool
 }
 
+var (
+	bsxml      = []byte("xml")
+	bsspace    = []byte("space")
+	bspreserve = []byte("preserve")
+)
+
 // NewDecoder creates a new Decoder.
 func NewDecoder(r io.Reader) Decoder {
 	return &decoder{
@@ -477,8 +483,8 @@ func (thiz *decoder) decodeAttribute(attr *Attr) error {
 		return err
 	}
 	// xml:space?
-	if bytes.Equal(name.Prefix, bs("xml")) && bytes.Equal(name.Local, bs("space")) {
-		thiz.preserveWhitespaces[thiz.top] = bytes.Equal(value, bs("preserve"))
+	if bytes.Equal(name.Prefix, bsxml) && bytes.Equal(name.Local, bsspace) {
+		thiz.preserveWhitespaces[thiz.top] = bytes.Equal(value, bspreserve)
 	}
 	attr.Name = name
 	attr.SingleQuote = singleQuote
