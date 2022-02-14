@@ -44,16 +44,13 @@ type EncoderMiddleware interface {
 // Encoder encodes Token values to an io.Writer.
 type Encoder struct {
 	// buffers writes to the underlying io.Writer
-	buf [2048]byte
+	buf []byte
 
 	// middlewares can modify encoded tokens before encoding.
 	middlewares []EncoderMiddleware
 
 	// The io.Writer we encode/write into.
 	wr io.Writer
-
-	// the current write position into buf
-	w int
 
 	// Whether the last token was of type TokenTypeStartElement.
 	// This is used to delay encoding the ending ">" or "/>" string
@@ -64,6 +61,7 @@ type Encoder struct {
 // NewEncoder creates a new Encoder with the given middlewares and returns a pointer to it.
 func NewEncoder(w io.Writer, middlewares ...EncoderMiddleware) *Encoder {
 	return &Encoder{
+		buf:         make([]byte, 0, 2048),
 		wr:          w,
 		middlewares: middlewares,
 	}
@@ -73,33 +71,31 @@ func NewEncoder(w io.Writer, middlewares ...EncoderMiddleware) *Encoder {
 // It must be called after token encoding is done in order
 // to write all remaining bytes into the io.Writer.
 func (thiz *Encoder) Flush() error {
-	_, err := thiz.wr.Write(thiz.buf[:thiz.w])
-	thiz.w = 0
+	_, err := thiz.wr.Write(thiz.buf)
+	thiz.buf = thiz.buf[:0]
 	return err
 }
 
 func (thiz *Encoder) write(b byte) error {
-	if thiz.w >= len(thiz.buf) {
+	if len(thiz.buf)+1 >= cap(thiz.buf) {
 		err := thiz.Flush()
 		if err != nil {
 			return err
 		}
 	}
-	thiz.buf[thiz.w] = b
-	thiz.w++
+	thiz.buf = append(thiz.buf, b)
 	return nil
 }
 
 func (thiz *Encoder) writeBytes(bs []byte) error {
 	l := len(bs)
-	if thiz.w+l > len(thiz.buf) {
+	if len(thiz.buf)+l >= cap(thiz.buf) {
 		err := thiz.Flush()
 		if err != nil {
 			return err
 		}
 	}
-	copy(thiz.buf[thiz.w:], bs)
-	thiz.w += l
+	thiz.buf = append(thiz.buf, bs...)
 	return nil
 }
 
@@ -107,7 +103,7 @@ func (thiz *Encoder) writeBytes(bs []byte) error {
 // and resets all middlewares.
 func (thiz *Encoder) Reset(w io.Writer) {
 	thiz.wr = w
-	thiz.w = 0
+	thiz.buf = thiz.buf[:0]
 	thiz.lastStartElement = false
 	for _, middleware := range thiz.middlewares {
 		middleware.Reset()

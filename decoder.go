@@ -439,6 +439,9 @@ func (thiz *decoder) decodeAttributes(b byte) ([]Attr, error) {
 				return nil, err
 			}
 			b, err = thiz.readByte()
+			if err != nil {
+				return nil, err
+			}
 			thiz.numAttributes[thiz.top]++
 		}
 	}

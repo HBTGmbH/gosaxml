@@ -1,6 +1,9 @@
 package gosaxml
 
-import "bytes"
+import (
+	"bytes"
+	"errors"
+)
 
 // NamespaceModifier can be used to obtain information about the
 // effective namespace of a decoded Token via NamespaceOfToken
@@ -44,13 +47,19 @@ func (thiz *NamespaceModifier) Reset() {
 // by the EncoderMiddleware.
 func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
 	if t.Kind == TokenTypeStartElement {
-		thiz.pushFrame()
+		err := thiz.pushFrame()
+		if err != nil {
+			return err
+		}
 		thiz.processNamespaces(t)
 		thiz.processElementName(t)
 		thiz.openNames[thiz.top] = t.Name
 	} else if t.Kind == TokenTypeEndElement {
 		thiz.processElementName(t)
-		thiz.popFrame()
+		err := thiz.popFrame()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -115,18 +124,26 @@ func (thiz *NamespaceModifier) findPrefixAlias(prefix []byte) []byte {
 	return nil
 }
 
-func (thiz *NamespaceModifier) pushFrame() {
+func (thiz *NamespaceModifier) pushFrame() error {
+	if thiz.top >= 255 {
+		return errors.New("stack overflow")
+	}
 	thiz.top++
 	thiz.nsOffs[thiz.top] = thiz.nsOffs[thiz.top-1]
 	thiz.prefixAliasesOffs[thiz.top] = thiz.prefixAliasesOffs[thiz.top-1]
+	return nil
 }
 
-func (thiz *NamespaceModifier) popFrame() {
+func (thiz *NamespaceModifier) popFrame() error {
+	if thiz.top <= 0 {
+		return errors.New("stack underflow")
+	}
 	thiz.top--
 	off := thiz.nsOffs[thiz.top]
 	thiz.namespaces = thiz.namespaces[:off*2]
 	off = thiz.prefixAliasesOffs[thiz.top]
 	thiz.prefixAliases = thiz.prefixAliases[:off*2]
+	return nil
 }
 
 // processNamespaces scans the attributes of the given token for namespace declarations,
