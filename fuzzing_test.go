@@ -13,6 +13,16 @@ var startNameRunes = []rune(":-_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV
 var restNameRunes = []rune("0123456789-_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var stringRunes = []rune("/:+*#.!§$%&/[]=?`´'0123456789-_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var textRunes = []rune("\"/:+*#'.!§$%&[]=?`´'0123456789-_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+var everythingRunes = []rune("<> \t\n\r\"/:+*#'.!§$%&[]=?`´'0123456789-_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randGarbage(r *rand.Rand) string {
+	c := r.Intn(8000)
+	b := make([]rune, c)
+	for i := 0; i < c; i++ {
+		b[i] = everythingRunes[r.Intn(len(everythingRunes))]
+	}
+	return string(b)
+}
 
 func randName(r *rand.Rand) string {
 	c := 1 + r.Intn(10)
@@ -98,7 +108,8 @@ func TestFuzz(t *testing.T) {
 		reader := bytes.NewReader(b.Bytes())
 		dec := gosaxml.NewDecoder(reader)
 		w := &bytes.Buffer{}
-		enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
+		modifier := gosaxml.NewNamespaceModifier()
+		enc := gosaxml.NewEncoder(w, modifier)
 		var tk gosaxml.Token
 
 		// when
@@ -108,6 +119,7 @@ func TestFuzz(t *testing.T) {
 				break
 			}
 			assert.Nil(t, err)
+			modifier.NamespaceOfToken(&tk)
 			err = enc.EncodeToken(&tk)
 			assert.Nil(t, err)
 		}
@@ -115,5 +127,39 @@ func TestFuzz(t *testing.T) {
 
 		// then
 		assert.Equal(t, xml, w.String())
+	}
+}
+
+func TestFuzzNoPanic(t *testing.T) {
+	// given
+	s1 := rand.NewSource(123456789)
+	r := rand.New(s1)
+	n := 100000
+
+	for i := 0; i < n; i++ {
+		xml := randGarbage(r)
+		reader := bytes.NewReader([]byte(xml))
+		dec := gosaxml.NewDecoder(reader)
+		w := &bytes.Buffer{}
+		modifier := gosaxml.NewNamespaceModifier()
+		enc := gosaxml.NewEncoder(w, modifier)
+		var tk gosaxml.Token
+
+		// when
+		for {
+			err := dec.NextToken(&tk)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				break
+			}
+			modifier.NamespaceOfToken(&tk)
+			err = enc.EncodeToken(&tk)
+			if err != nil {
+				break
+			}
+		}
+		assert.Nil(t, enc.Flush())
 	}
 }
