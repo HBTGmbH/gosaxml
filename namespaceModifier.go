@@ -9,9 +9,9 @@ import (
 // effective namespace of a decoded Token via NamespaceOfToken
 // and to canonicalize/minify namespace declarations.
 type NamespaceModifier struct {
-	openNames         [32]Name
-	nsOffs            [32]int32
-	prefixAliasesOffs [32]int32
+	openNames         [256]Name
+	nsOffs            [256]int32
+	prefixAliasesOffs [256]int32
 
 	namespaces    [][]byte
 	prefixAliases [][]byte
