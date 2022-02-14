@@ -32,8 +32,6 @@ type decoder struct {
 	attrs               []Attr
 	r                   int
 	w                   int
-	read                byte
-	write               byte
 	top                 byte
 	lastStartElement    bool
 }
@@ -103,6 +101,7 @@ func (thiz *decoder) Reset(r io.Reader) {
 	thiz.attrs = thiz.attrs[:0]
 	thiz.bb = thiz.bb[:0]
 	thiz.top = 0
+	thiz.lastStartElement = false
 }
 
 func (thiz *decoder) skipWhitespaces(b byte) (byte, error) {
