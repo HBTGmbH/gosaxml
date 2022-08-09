@@ -436,6 +436,32 @@ func TestInsignificantWhitespace(t *testing.T) {
 		"<a xml:space=\"preserve\">\n</a>", w.String())
 }
 
+func BenchmarkLotsOfText(b *testing.B) {
+	r := strings.NewReader(
+		`<a>Convert multiple numbers to strings and do something with them for as long as it takes</a>`)
+	dec := gosaxml.NewDecoder(r)
+	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := r.Seek(0, io.SeekStart)
+		assert.Nil(b, err)
+		dec.Reset(r)
+		for {
+			err = dec.NextToken(&tk)
+			if err == io.EOF {
+				break
+			}
+			assert.Nil(b, err)
+			err = enc.EncodeToken(&tk)
+			assert.Nil(b, err)
+		}
+	}
+}
+
 func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *gosaxml.Token) {
 	for {
 		err := dec.NextToken(tk)
