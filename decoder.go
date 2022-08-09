@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/klauspost/cpuid/v2"
 	"io"
 )
+
+var canUseSSE = cpuid.CPU.Has(cpuid.SSE) && cpuid.CPU.Has(cpuid.BMI1)
 
 // Decoder decodes an XML input stream into Token values.
 type Decoder interface {
@@ -52,7 +55,7 @@ func NewDecoder(r io.Reader) Decoder {
 }
 
 func isWhitespace(b byte) bool {
-	return b == '\t' || b == '\n' || b == '\r' || b == ' '
+	return b <= ' '
 }
 
 func (thiz *decoder) read0() error {
@@ -61,7 +64,7 @@ func (thiz *decoder) read0() error {
 		thiz.w -= thiz.r
 		thiz.r = 0
 	}
-	n, err := thiz.rd.Read(thiz.rb[thiz.w:])
+	n, err := thiz.rd.Read(thiz.rb[thiz.w : cap(thiz.rb)-16])
 	thiz.w += n
 	if n <= 0 && err != nil {
 		return err
@@ -323,7 +326,47 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 	return nil
 }
 
+func (thiz *decoder) decodeTextSSE(t *Token) (bool, error) {
+	i := len(thiz.bb)
+	onlyWhitespaces := true
+	for {
+		j := thiz.r
+		c := 0
+		for thiz.w > thiz.r+c {
+			sidx := findFirstOpenAngleBracket16(thiz.rb[j+c : thiz.w])
+			onlyWhitespaces = onlyWhitespaces && onlySpacesUntil16(thiz.rb[j+c:thiz.w], sidx)
+			c += sidx
+			if sidx != 16 {
+				_, err := thiz.discard(c)
+				if err != nil {
+					return false, err
+				}
+				if onlyWhitespaces && !thiz.preserveWhitespaces[thiz.top] {
+					return true, nil
+				}
+				thiz.bb = append(thiz.bb, thiz.rb[j:j+c]...)
+				t.Kind = TokenTypeTextElement
+				t.ByteData = thiz.bb[i:len(thiz.bb)]
+				return false, nil
+			}
+		}
+		thiz.bb = append(thiz.bb, thiz.rb[j:thiz.w]...)
+		thiz.discardBuffer()
+		err := thiz.read0()
+		if err != nil {
+			return false, err
+		}
+	}
+}
+
 func (thiz *decoder) decodeText(t *Token) (bool, error) {
+	if canUseSSE {
+		return thiz.decodeTextSSE(t)
+	}
+	return thiz.decodeTextGeneric(t)
+}
+
+func (thiz *decoder) decodeTextGeneric(t *Token) (bool, error) {
 	i := len(thiz.bb)
 	onlyWhitespaces := true
 	for {
