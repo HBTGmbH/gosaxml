@@ -16,7 +16,6 @@ warningCode = 1
 [rule.increment-decrement]
 [rule.var-naming]
 [rule.var-declaration]
-[rule.package-comments]
 [rule.range]
 [rule.receiver-naming]
 [rule.time-equal]
@@ -58,3 +57,5 @@ warningCode = 1
 [rule.confusing-results]
 [rule.struct-tag]
 [rule.empty-lines]
+[rule.use-any]
+[rule.datarace]
