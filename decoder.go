@@ -276,31 +276,39 @@ func (thiz *decoder) ignoreComment() error {
 		return err
 	}
 	for {
-		var b byte
-		b, err = thiz.readByte()
-		if err != nil {
-			return err
-		}
-		if b == '-' {
-			var b2 byte
-			b2, err = thiz.readByte()
-			if err != nil {
-				return err
-			}
-			if b2 == '-' {
-				for {
-					var b3 byte
-					b3, err = thiz.readByte()
-					if err != nil {
-						return err
-					}
-					if b3 == '>' {
-						return nil
-					} else if b3 != '-' {
-						break
+		for thiz.w > thiz.r {
+			k := bytes.IndexByte(thiz.rb[thiz.r:thiz.w], '-')
+			if k > -1 {
+				_, err = thiz.discard(k + 1)
+				if err != nil {
+					return err
+				}
+				var b2 byte
+				b2, err = thiz.readByte()
+				if err != nil {
+					return err
+				}
+				if b2 == '-' {
+					for {
+						var b3 byte
+						b3, err = thiz.readByte()
+						if err != nil {
+							return err
+						}
+						if b3 == '>' {
+							return nil
+						} else if b3 != '-' {
+							break
+						}
 					}
 				}
+			} else {
+				thiz.discardBuffer()
 			}
+		}
+		err := thiz.read0()
+		if err != nil {
+			return err
 		}
 	}
 }

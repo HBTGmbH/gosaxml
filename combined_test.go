@@ -462,6 +462,41 @@ func BenchmarkLotsOfText(b *testing.B) {
 	}
 }
 
+func BenchmarkWithSkippedWhitespace(b *testing.B) {
+	r := strings.NewReader(
+		`
+<soap:Envelope
+xmlns:soap="http://www.w3.org/2003/05/soap-envelope/"
+soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
+<soap:Body>
+  <m:GetPrice xmlns:m="https://www.w3schools.com/prices">
+    <!-- we want to add a <m:Item>Apples</m:Item> here -->
+  </m:GetPrice>
+</soap:Body>
+</soap:Envelope>`)
+	dec := gosaxml.NewDecoder(r)
+	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
+	var tk gosaxml.Token
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := r.Seek(0, io.SeekStart)
+		assert.Nil(b, err)
+		dec.Reset(r)
+		for {
+			err = dec.NextToken(&tk)
+			if err == io.EOF {
+				break
+			}
+			assert.Nil(b, err)
+			err = enc.EncodeToken(&tk)
+			assert.Nil(b, err)
+		}
+	}
+}
+
 func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *gosaxml.Token) {
 	for {
 		err := dec.NextToken(tk)
