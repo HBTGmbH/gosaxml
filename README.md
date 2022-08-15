@@ -7,6 +7,8 @@ In addition to handling namespaces, gosaxml can also canonicalize and minify XML
 and does not repeat the prefix-less namespace declaration
 on all encoded XML elements, like `encoding/xml` does.
 
+Due to the way it is implemented right now, the byte slices it reads from a provided `io.Reader` can only be ASCII or UTF-8 encoded. UTF-16 and UTF-32 character encodings or other encodings not identical with the ASCII character set or not using multi-byte encodings where the high bit is always set, are _not_ supported.
+
 # Get it
 
 ```shell
