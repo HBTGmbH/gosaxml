@@ -48,7 +48,7 @@ TEXT ·onlySpaces32(SB),NOSPLIT, $0
     VMOVDQU (DI), Y0
     VMOVDQA Y0, Y1
     VPCMPGTB ·spc<>(SB), Y0, Y0
-    VPXOR Y2, Y2, Y2
+    VPXOR X2, X2, X2
     VPCMPGTB Y1, Y2, Y2
     VPOR Y2, Y0, Y0
     VPMOVMSKB Y0, AX
