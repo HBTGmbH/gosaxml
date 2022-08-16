@@ -116,7 +116,7 @@ func (thiz *NamespaceModifier) findPrefixForNamespace(namespace []byte) []byte {
 }
 
 // findPrefixAlias finds the alias for the given prefix.
-// There is an alias for a given prefix it, during encoding, the prefix
+// There is an alias for a given prefix if, during encoding, the prefix
 // has been replaced with a (possibly) shorter alternative.
 func (thiz *NamespaceModifier) findPrefixAlias(prefix []byte) []byte {
 	// scan all frames up to the top
