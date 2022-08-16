@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"github.com/HBTGmbH/gosaxml"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
+	"io"
 	"testing"
 )
 
 func BenchmarkEncodeStartTokenWithNamespaceModifier(b *testing.B) {
-	w := ioutil.Discard
+	w := io.Discard
 	enc := gosaxml.NewEncoder(w, gosaxml.NewNamespaceModifier())
 	token := gosaxml.Token{
 		Kind: gosaxml.TokenTypeStartElement,
@@ -35,7 +35,7 @@ func BenchmarkEncodeStartTokenWithNamespaceModifier(b *testing.B) {
 }
 
 func BenchmarkEncode(b *testing.B) {
-	w := ioutil.Discard
+	w := io.Discard
 	enc := gosaxml.NewEncoder(w)
 	token0 := gosaxml.Token{
 		Kind: gosaxml.TokenTypeStartElement,
