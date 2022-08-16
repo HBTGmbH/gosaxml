@@ -126,6 +126,72 @@ func (thiz *decoder) Reset(r io.Reader) {
 }
 
 func (thiz *decoder) skipWhitespaces(b byte) (byte, error) {
+	if canUseAVX2 {
+		return thiz.skipWhitespacesAVX2(b)
+	} else if canUseSSE {
+		return thiz.skipWhitespacesSSE(b)
+	}
+	return thiz.skipWhitespacesGeneric(b)
+}
+
+func (thiz *decoder) skipWhitespacesAVX2(b byte) (byte, error) {
+	if !isWhitespace(b) {
+		return b, nil
+	}
+	for {
+		for thiz.w > thiz.r {
+			sidx := int(onlySpaces32(thiz.rb[thiz.r:thiz.w]))
+			_, err := thiz.discard(sidx)
+			if err != nil {
+				return 0, err
+			}
+			if sidx != 32 {
+				newB, err := thiz.readByte()
+				if err != nil {
+					return 0, err
+				}
+				return newB, nil
+			}
+		}
+		thiz.discardBuffer()
+		err := thiz.read0()
+		if err != nil {
+			return 0, err
+		}
+	}
+}
+
+func (thiz *decoder) skipWhitespacesSSE(b byte) (byte, error) {
+	if !isWhitespace(b) {
+		return b, nil
+	}
+	for {
+		j := thiz.r
+		c := 0
+		for thiz.w > thiz.r+c {
+			sidx := onlySpaces32(thiz.rb[j+c : thiz.w])
+			c += int(sidx)
+			if sidx != 16 {
+				_, err := thiz.discard(c)
+				if err != nil {
+					return 0, err
+				}
+				newB, err := thiz.readByte()
+				if err != nil {
+					return 0, err
+				}
+				return newB, nil
+			}
+		}
+		thiz.discardBuffer()
+		err := thiz.read0()
+		if err != nil {
+			return 0, err
+		}
+	}
+}
+
+func (thiz *decoder) skipWhitespacesGeneric(b byte) (byte, error) {
 	for {
 		if !isWhitespace(b) {
 			return b, nil
@@ -355,7 +421,7 @@ func (thiz *decoder) decodeTextSSE(t *Token) (bool, error) {
 		for thiz.w > thiz.r+c {
 			sidx := findFirstOpenAngleBracket16(thiz.rb[j+c : thiz.w])
 			onlyWhitespaces = onlyWhitespaces && onlySpacesUntil16(thiz.rb[j+c:thiz.w], sidx)
-			c += sidx
+			c += int(sidx)
 			if sidx != 16 {
 				_, err := thiz.discard(c)
 				if err != nil {
@@ -388,7 +454,7 @@ func (thiz *decoder) decodeTextAVX2(t *Token) (bool, error) {
 		for thiz.w > thiz.r+c {
 			sidx := findFirstOpenAngleBracket32(thiz.rb[j+c : thiz.w])
 			onlyWhitespaces = onlyWhitespaces && onlySpacesUntil32(thiz.rb[j+c:thiz.w], sidx)
-			c += sidx
+			c += int(sidx)
 			if sidx != 32 {
 				_, err := thiz.discard(c)
 				if err != nil {

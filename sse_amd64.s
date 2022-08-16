@@ -18,7 +18,7 @@ TEXT ·openAngleBracket16(SB),NOSPLIT, $0
     PCMPEQB ·oab<>(SB), X0
     PMOVMSKB X0, AX
     TZCNTW AX, AX
-    MOVW AX, ret+24(FP)
+    MOVB AX, ret+24(FP)
     RET
 
 TEXT ·openAngleBracket32(SB),NOSPLIT, $0
@@ -27,7 +27,7 @@ TEXT ·openAngleBracket32(SB),NOSPLIT, $0
     VPCMPEQB ·oab<>(SB), Y0, Y0
     VPMOVMSKB Y0, AX
     TZCNTL AX, AX
-    MOVQ AX, ret+24(FP)
+    MOVB AX, ret+24(FP)
     VZEROUPPER // <- https://i.stack.imgur.com/dGpbi.png
     RET
 
@@ -40,7 +40,8 @@ TEXT ·onlySpaces16(SB),NOSPLIT, $0
     PCMPGTB X1, X2
     POR X2, X0
     PMOVMSKB X0, AX
-    MOVW AX, ret+24(FP)
+    TZCNTW AX, AX
+    MOVB AX, ret+24(FP)
     RET
 
 TEXT ·onlySpaces32(SB),NOSPLIT, $0
@@ -52,6 +53,7 @@ TEXT ·onlySpaces32(SB),NOSPLIT, $0
     VPCMPGTB Y1, Y2, Y2
     VPOR Y2, Y0, Y0
     VPMOVMSKB Y0, AX
-    MOVL AX, ret+24(FP)
+    TZCNTL AX, AX
+    MOVB AX, ret+24(FP)
     VZEROUPPER // <- https://i.stack.imgur.com/dGpbi.png
     RET

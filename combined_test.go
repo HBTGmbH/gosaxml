@@ -420,8 +420,8 @@ func TestPreserveWhitespace(t *testing.T) {
 func TestInsignificantWhitespace(t *testing.T) {
 	// given
 	input := `
-<?xml    version="1.0"  encoding="utf-8"   ?>
-<a   xml:space = "preserve" >
+<?xml    version    =   "1.0"  encoding  =   "utf-8"   ?>
+<a   xml:space  =  "preserve" >
 </a  >`
 	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	w := &bytes.Buffer{}
@@ -432,7 +432,7 @@ func TestInsignificantWhitespace(t *testing.T) {
 	decodeEncode(t, dec, enc, &tk)
 
 	// then
-	assert.Equal(t, "<?xml version=\"1.0\"  encoding=\"utf-8\"?>"+
+	assert.Equal(t, "<?xml version    =   \"1.0\"  encoding  =   \"utf-8\"?>"+
 		"<a xml:space=\"preserve\">\n</a>", w.String())
 }
 
@@ -462,18 +462,10 @@ func BenchmarkLotsOfText(b *testing.B) {
 	}
 }
 
-func BenchmarkWithSkippedWhitespace(b *testing.B) {
+func BenchmarkWithWhitespaceInAttributes(b *testing.B) {
 	r := strings.NewReader(
-		`
-<soap:Envelope
-xmlns:soap="http://www.w3.org/2003/05/soap-envelope/"
-soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
-<soap:Body>
-  <m:GetPrice xmlns:m="https://www.w3schools.com/prices">
-    <!-- we want to add a <m:Item>Apples</m:Item> here -->
-  </m:GetPrice>
-</soap:Body>
-</soap:Envelope>`)
+		`<a         a        =       "test"         >
+        </a   >`)
 	dec := gosaxml.NewDecoder(r)
 	enc := gosaxml.NewEncoder(io.Discard, gosaxml.NewNamespaceModifier())
 	var tk gosaxml.Token
