@@ -224,7 +224,7 @@ func (thiz *NamespaceModifier) addPrefixRewrite(original, prefix []byte) {
 // of the pointed-to Token. The caller must make sure that the Token's fields/values
 // will remain unmodified for the lexical scope of the XML element represented
 // by that token, as per the documentation of EncoderMiddleware.EncodeToken.
-func (thiz NamespaceModifier) NamespaceOfToken(t *Token) []byte {
+func (thiz *NamespaceModifier) NamespaceOfToken(t *Token) []byte {
 	if t.Kind == TokenTypeInvalid {
 		return nil
 	}
