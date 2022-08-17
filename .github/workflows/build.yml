@@ -7,11 +7,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [ '1.17', '1.18', '1.19' ]
+    name: Go ${{ matrix.go }} build
     steps:
       - uses: actions/checkout@master
       - uses: reviewdog/action-golangci-lint@v2
         with:
           fail_on_error: true
+          go_version: ${{ matrix.go }}
       - run: |
           gofmt -l . && test -z $(gofmt -l .)
           go vet .
