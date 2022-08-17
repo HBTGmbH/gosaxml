@@ -420,7 +420,7 @@ func (thiz *decoder) decodeTextSSE(t *Token) (bool, error) {
 		c := 0
 		for thiz.w > thiz.r+c {
 			sidx := openAngleBracket16(thiz.rb[j+c : thiz.w])
-			onlyWhitespaces = onlyWhitespaces && onlySpacesUntil16(thiz.rb[j+c:thiz.w], sidx)
+			onlyWhitespaces = onlyWhitespaces && onlySpaces16(thiz.rb[j+c:thiz.w]) >= sidx
 			c += int(sidx)
 			if sidx != 16 {
 				_, err := thiz.discard(c)
@@ -453,7 +453,7 @@ func (thiz *decoder) decodeTextAVX2(t *Token) (bool, error) {
 		c := 0
 		for thiz.w > thiz.r+c {
 			sidx := openAngleBracket32(thiz.rb[j+c : thiz.w])
-			onlyWhitespaces = onlyWhitespaces && onlySpacesUntil32(thiz.rb[j+c:thiz.w], sidx)
+			onlyWhitespaces = onlyWhitespaces && onlySpaces32(thiz.rb[j+c:thiz.w]) >= sidx
 			c += int(sidx)
 			if sidx != 32 {
 				_, err := thiz.discard(c)
