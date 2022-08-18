@@ -5,22 +5,44 @@ on:
   pull_request:
     branches: [ main ]
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: lint
+    steps:
+      - uses: actions/checkout@master
+      - uses: reviewdog/action-golangci-lint@v2
+        with:
+          fail_on_error: true
+      - run: |
+          gofmt -l . && test -z $(gofmt -l .)
+          go vet .
+          go install github.com/mgechev/revive@latest
+          revive -config revive.toml .
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         go: [ '1.17', '1.18', '1.19' ]
-    name: Go ${{ matrix.go }} build
+        os: [ 'windows', 'linux' ]
+        arch: [ 'amd64', 'arm64' ]
+    name: Go ${{ matrix.go }}-${{ matrix.os }}-${{ matrix.arch }} build
     steps:
       - uses: actions/checkout@master
       - uses: reviewdog/action-golangci-lint@v2
         with:
           fail_on_error: true
           go_version: ${{ matrix.go }}
-      - run: |
-          gofmt -l . && test -z $(gofmt -l .)
-          go vet .
-          go install github.com/mgechev/revive@latest
-          revive -config revive.toml .
-      - run: go build -v .
+      - run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -v .
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [ '1.17', '1.18', '1.19' ]
+    name: Go ${{ matrix.go }} test
+    steps:
+      - uses: actions/checkout@master
+      - uses: reviewdog/action-golangci-lint@v2
+        with:
+          fail_on_error: true
+          go_version: ${{ matrix.go }}
       - run: go test -v .
