@@ -7,3 +7,7 @@ func (thiz *decoder) skipWhitespaces(b byte) (byte, error) {
 func (thiz *decoder) decodeText(t *Token) (bool, error) {
 	return thiz.decodeTextGeneric(t)
 }
+
+func (thiz *decoder) readSimpleName() ([]byte, byte, error) {
+	return thiz.readSimpleNameGeneric()
+}

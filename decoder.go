@@ -412,7 +412,7 @@ func isSeparator(b byte) bool {
 	return int(b) < len(seps) && seps[b]
 }
 
-func (thiz *decoder) readSimpleName() ([]byte, byte, error) {
+func (thiz *decoder) readSimpleNameGeneric() ([]byte, byte, error) {
 	i := len(thiz.bb)
 	for {
 		j := thiz.r

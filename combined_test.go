@@ -489,6 +489,38 @@ func BenchmarkWithWhitespaceInAttributes(b *testing.B) {
 	}
 }
 
+func BenchmarkLotsOfElementNames(b *testing.B) {
+	r := strings.NewReader(
+		`<bookstore>
+  <bookFromAuthor></bookFromAuthor>
+  <bookFromAuthor></bookFromAuthor>
+  <bookFromAuthor></bookFromAuthor>
+  <bookFromAuthor></bookFromAuthor>
+  <bookFromAuthor></bookFromAuthor>
+  <bookFromAuthor></bookFromAuthor>
+  <bookFromAuthor></bookFromAuthor>
+  <bookFromAuthor></bookFromAuthor>
+  <bookFromAuthor></bookFromAuthor>
+</bookstore>`)
+	dec := gosaxml.NewDecoder(r)
+	var tk gosaxml.Token
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := r.Seek(0, io.SeekStart)
+		assert.Nil(b, err)
+		dec.Reset(r)
+		for {
+			err = dec.NextToken(&tk)
+			if err == io.EOF {
+				break
+			}
+		}
+	}
+}
+
 func decodeEncode(t *testing.T, dec gosaxml.Decoder, enc *gosaxml.Encoder, tk *gosaxml.Token) {
 	for {
 		err := dec.NextToken(tk)
