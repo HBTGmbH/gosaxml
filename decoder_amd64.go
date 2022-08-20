@@ -153,3 +153,36 @@ func (thiz *decoder) decodeTextAVX2(t *Token) (bool, error) {
 		}
 	}
 }
+
+func (thiz *decoder) readSimpleName() ([]byte, byte, error) {
+	if canUseAVX2 {
+		return thiz.readSimpleNameAVX()
+	}
+	return thiz.readSimpleNameGeneric()
+}
+
+func (thiz *decoder) readSimpleNameAVX() ([]byte, byte, error) {
+	i := len(thiz.bb)
+	for {
+		j := thiz.r
+		c := 0
+		for thiz.w > thiz.r+c {
+			sidx := int(seperator32(thiz.rb[j+c : thiz.w]))
+			c += sidx
+			if sidx != 32 {
+				_, err := thiz.discard(c + 1)
+				if err != nil {
+					return nil, 0, err
+				}
+				thiz.bb = append(thiz.bb, thiz.rb[j:j+c]...)
+				return thiz.bb[i:len(thiz.bb)], thiz.rb[j+c], nil
+			}
+		}
+		thiz.bb = append(thiz.bb, thiz.rb[j:thiz.w]...)
+		thiz.discardBuffer()
+		err := thiz.read0()
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+}
