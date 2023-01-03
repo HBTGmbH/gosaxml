@@ -178,6 +178,29 @@ func TestIgnoreComments(t *testing.T) {
 	assert.Equal(t, io.EOF, err3)
 }
 
+func TestInputOffset(t *testing.T) {
+	// given
+	var tk gosaxml.Token
+
+	doc := "<a>Testing input offset</a>"
+	lastOffset := len(doc)
+
+	dec := gosaxml.NewDecoder(bufio.NewReaderSize(strings.NewReader(doc), 1024))
+
+	// when
+	_ = dec.NextToken(&tk)
+	off1 := dec.InputOffset()
+	_ = dec.NextToken(&tk)
+	off2 := dec.InputOffset()
+	_ = dec.NextToken(&tk)
+	off3 := dec.InputOffset()
+
+	// then
+	assert.Equal(t, 2, off1)
+	assert.Equal(t, 23, off2)
+	assert.Equal(t, lastOffset, off3)
+}
+
 func assertTextElement(t *testing.T, text string, token gosaxml.Token) {
 	assert.Equal(t, uint8(gosaxml.TokenTypeTextElement), token.Kind)
 	assert.Equal(t, []byte(text), token.ByteData)
