@@ -59,3 +59,4 @@ warningCode = 1
 [rule.empty-lines]
 [rule.use-any]
 [rule.datarace]
+[rule.comment-spacings]
