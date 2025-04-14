@@ -45,8 +45,8 @@ func TestSeparator32(t *testing.T) {
 	assert.Equal(t, byte(5), seperator32(at(slice(32, 'a'), 5, '\r')))
 }
 
-func slice(len int, v uint8) []uint8 {
-	s := make([]uint8, len)
+func slice(l int, v uint8) []uint8 {
+	s := make([]uint8, l)
 	for i := range s {
 		s[i] = v
 	}
