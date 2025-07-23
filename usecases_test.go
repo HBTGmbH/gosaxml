@@ -43,7 +43,6 @@ soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
 		if tk.Kind == gosaxml.TokenTypeStartElement &&
 			bytes.Equal(tk.Name.Local, []byte("GetPrice")) &&
 			bytes.Equal(nm.NamespaceOfToken(&tk), []byte(pricesNamespace)) {
-
 			// inject '<m:Item>Apples</m:Item>' here.
 			// We do not know the concrete prefix to use, but we _do_ know the namespace
 			// that we want the new element to reside in (this is usually known in advance).
