@@ -28,12 +28,12 @@ func (thiz *decoder) skipWhitespacesAVX2(b byte) (byte, error) {
 	}
 	for {
 		for thiz.w > thiz.r {
-			sidx := int(onlySpaces32(thiz.rb[thiz.r:thiz.w]))
+			sidx, isWhole := clampToBuf(onlySpaces32, 32, thiz.rb[thiz.r:thiz.w])
 			_, err := thiz.discard(sidx)
 			if err != nil {
 				return 0, err
 			}
-			if sidx != 32 {
+			if !isWhole {
 				newB, err := thiz.readByte()
 				if err != nil {
 					return 0, err
@@ -57,9 +57,9 @@ func (thiz *decoder) skipWhitespacesSSE(b byte) (byte, error) {
 		j := thiz.r
 		c := 0
 		for thiz.w > thiz.r+c {
-			sidx := onlySpaces32(thiz.rb[j+c : thiz.w])
+			sidx, isWhole := clampToBuf(onlySpaces16, 16, thiz.rb[j+c:thiz.w])
 			c += int(sidx)
-			if sidx != 16 {
+			if !isWhole {
 				_, err := thiz.discard(c)
 				if err != nil {
 					return 0, err
@@ -128,10 +128,10 @@ func (thiz *decoder) decodeTextAVX2(t *Token) (bool, error) {
 		j := thiz.r
 		c := 0
 		for thiz.w > thiz.r+c {
-			sidx := openAngleBracket32(thiz.rb[j+c : thiz.w])
-			onlyWhitespaces = onlyWhitespaces && onlySpaces32(thiz.rb[j+c:thiz.w]) >= sidx
+			sidx, isWhole := clampToBuf(openAngleBracket32, 32, thiz.rb[j+c:thiz.w])
+			onlyWhitespaces = onlyWhitespaces && int(onlySpaces32(thiz.rb[j+c:thiz.w])) >= sidx
 			c += int(sidx)
-			if sidx != 32 {
+			if !isWhole {
 				_, err := thiz.discard(c)
 				if err != nil {
 					return false, err
@@ -167,9 +167,9 @@ func (thiz *decoder) readSimpleNameAVX() ([]byte, byte, error) {
 		j := thiz.r
 		c := 0
 		for thiz.w > thiz.r+c {
-			sidx := int(seperator32(thiz.rb[j+c : thiz.w]))
+			sidx, isWhole := clampToBuf(seperator32, 32, thiz.rb[j+c:thiz.w])
 			c += sidx
-			if sidx != 32 {
+			if !isWhole {
 				_, err := thiz.discard(c + 1)
 				if err != nil {
 					return nil, 0, err
@@ -185,4 +185,15 @@ func (thiz *decoder) readSimpleNameAVX() ([]byte, byte, error) {
 			return nil, 0, err
 		}
 	}
+}
+
+// clampToBuf adapts a fixed-width SIMD scanner to arbitrary-length slices.
+// It clamps the returned index when buf is shorter than vectorSize and reports
+// whether the scan covered the entire provided buf (no early terminator found).
+func clampToBuf(vectorFn func([]byte) byte, vectorSize int, buf []byte) (int, bool) {
+	res := int(vectorFn(buf))
+	if res >= len(buf) {
+		return len(buf), true
+	}
+	return res, res == vectorSize
 }
