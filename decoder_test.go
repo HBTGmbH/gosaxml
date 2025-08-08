@@ -178,6 +178,55 @@ func TestIgnoreComments(t *testing.T) {
 	assert.Equal(t, io.EOF, err3)
 }
 
+type chunkReader [][]byte
+
+func (r *chunkReader) Read(p []byte) (n int, err error) {
+	if len(*r) == 0 {
+		return 0, io.EOF
+	}
+	chunk := (*r)[0]
+	if len(chunk) > len(p) {
+		return 0, io.ErrShortBuffer
+	}
+	*r = (*r)[1:]
+	return copy(p, chunk), nil
+}
+
+func TestDecodeChunked(t *testing.T) {
+	// given
+	rd := &chunkReader{
+		[]byte(`<root attr1="`),
+		[]byte(`1"><foo a="2"`),
+		[]byte(`><ba`),
+		[]byte(`r/></foo></`),
+		[]byte(`root>`),
+	}
+	dec := gosaxml.NewDecoder(rd)
+	var tk gosaxml.Token
+
+	// when/then
+	err := dec.NextToken(&tk)
+	assert.Nil(t, err)
+	assert.Equal(t, startElementWithAttr("root", "attr1", "1"), tk)
+	err = dec.NextToken(&tk)
+	assert.Nil(t, err)
+	assert.Equal(t, startElementWithAttr("foo", "a", "2"), tk)
+	err = dec.NextToken(&tk)
+	assert.Nil(t, err)
+	assert.Equal(t, startElement("bar"), tk)
+	err = dec.NextToken(&tk)
+	assert.Nil(t, err)
+	assertEndElement(t, "bar", tk)
+	err = dec.NextToken(&tk)
+	assert.Nil(t, err)
+	assertEndElement(t, "foo", tk)
+	err = dec.NextToken(&tk)
+	assert.Nil(t, err)
+	assertEndElement(t, "root", tk)
+	err = dec.NextToken(&tk)
+	assert.Equal(t, io.EOF, err)
+}
+
 func TestInputOffset(t *testing.T) {
 	// given
 	var tk gosaxml.Token
