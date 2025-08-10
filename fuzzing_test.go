@@ -56,31 +56,31 @@ func buildElement(i int, b *bytes.Buffer, r *rand.Rand, lastOpen bool) bool {
 	switch i {
 	case 0:
 		if lastOpen {
-			b.WriteString(">")
+			_, _ = b.WriteString(">")
 		}
 		name := randName(r)
-		b.WriteString("<")
-		b.WriteString(name)
+		_, _ = b.WriteString("<")
+		_, _ = b.WriteString(name)
 		numAttrs := r.Intn(10)
 		for j := 0; j < numAttrs; j++ {
-			b.WriteString(" ")
+			_, _ = b.WriteString(" ")
 			buildAttribute(b, r)
 		}
 		ended := buildElement(r.Intn(2), b, r, true)
 		if !ended {
-			b.WriteString("</")
-			b.WriteString(name)
-			b.WriteString(">")
+			_, _ = b.WriteString("</")
+			_, _ = b.WriteString(name)
+			_, _ = b.WriteString(">")
 		}
 		return false
 	case 1:
 		if lastOpen {
-			b.WriteString(">")
+			_, _ = b.WriteString(">")
 		}
-		b.WriteString(randText(r))
+		_, _ = b.WriteString(randText(r))
 		return false
 	default:
-		b.WriteString("/>")
+		_, _ = b.WriteString("/>")
 		return true
 	}
 }
@@ -89,10 +89,10 @@ func buildAttribute(b *bytes.Buffer, r *rand.Rand) {
 	name := randName(r)
 	value := randString(r)
 	randName(r)
-	b.WriteString(name)
-	b.WriteString("=\"")
-	b.WriteString(value)
-	b.WriteString("\"")
+	_, _ = b.WriteString(name)
+	_, _ = b.WriteString("=\"")
+	_, _ = b.WriteString(value)
+	_, _ = b.WriteString("\"")
 }
 
 func TestFuzz(t *testing.T) {
