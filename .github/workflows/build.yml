@@ -30,7 +30,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        go: [ '1.22', '1.23', '1.24' ]
+        go: [ '1.24', '1.25', '1.26' ]
         os: [ 'windows', 'linux' ]
         arch: [ 'amd64', 'arm64' ]
     name: Go ${{ matrix.go }}-${{ matrix.os }}-${{ matrix.arch }} build
