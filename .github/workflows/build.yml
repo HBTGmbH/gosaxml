@@ -4,13 +4,19 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+permissions:
+  contents: read
 jobs:
   lint:
     runs-on: ubuntu-latest
     name: lint
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@master
-      - uses: reviewdog/action-golangci-lint@v2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: reviewdog/action-golangci-lint@c76cceaaab89abe74e649d2e34c6c9adc26662d2 # v2.10.0
         with:
           fail_on_error: true
       - run: |
@@ -20,6 +26,8 @@ jobs:
           revive -config revive.toml .
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         go: [ '1.22', '1.23', '1.24' ]
@@ -27,21 +35,27 @@ jobs:
         arch: [ 'amd64', 'arm64' ]
     name: Go ${{ matrix.go }}-${{ matrix.os }}-${{ matrix.arch }} build
     steps:
-      - uses: actions/checkout@master
-      - uses: reviewdog/action-golangci-lint@v2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: reviewdog/action-golangci-lint@c76cceaaab89abe74e649d2e34c6c9adc26662d2 # v2.10.0
         with:
           fail_on_error: true
           go_version: ${{ matrix.go }}
       - run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -v .
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         go: [ '1.22', '1.23', '1.24' ]
     name: Go ${{ matrix.go }} test
     steps:
-      - uses: actions/checkout@master
-      - uses: reviewdog/action-golangci-lint@v2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: reviewdog/action-golangci-lint@c76cceaaab89abe74e649d2e34c6c9adc26662d2 # v2.10.0
         with:
           fail_on_error: true
           go_version: ${{ matrix.go }}
