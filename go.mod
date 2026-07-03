@@ -1,9 +1,9 @@
 module github.com/HBTGmbH/gosaxml
 
-go 1.24.0
+go 1.25.0
 
 require (
-	github.com/klauspost/cpuid/v2 v2.3.0
+	github.com/klauspost/cpuid/v2 v2.4.0
 	github.com/stretchr/testify v1.11.1
 )
 
