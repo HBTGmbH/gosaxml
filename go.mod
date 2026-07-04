@@ -1,6 +1,6 @@
 module github.com/HBTGmbH/gosaxml
 
-go 1.25.0
+go 1.24.0
 
 require (
 	github.com/klauspost/cpuid/v2 v2.4.0
