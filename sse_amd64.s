@@ -24,9 +24,9 @@ DATA ·lo_nibbles<>+16(SB)/8, $0x0000000000000010
 DATA ·lo_nibbles<>+24(SB)/8, $0x0804820000412000
 GLOBL ·lo_nibbles<>(SB), NOPTR+RODATA, $32
 
-DATA ·hi_nibbles<>+0(SB)/8, $0x00000000071800E0
+DATA ·hi_nibbles<>+0(SB)/8, $0x000000000F1800E0
 DATA ·hi_nibbles<>+8(SB)/8, $0x0000000000000000
-DATA ·hi_nibbles<>+16(SB)/8, $0x00000000071800E0
+DATA ·hi_nibbles<>+16(SB)/8, $0x000000000F1800E0
 DATA ·hi_nibbles<>+24(SB)/8, $0x0000000000000000
 GLOBL ·hi_nibbles<>(SB), NOPTR+RODATA, $32
 

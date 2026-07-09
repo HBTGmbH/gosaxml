@@ -43,6 +43,9 @@ func TestSeparator32(t *testing.T) {
 	assert.Equal(t, byte(5), seperator32(at(slice(32, 'a'), 5, '\t')))
 	assert.Equal(t, byte(5), seperator32(at(slice(32, 'a'), 5, '\n')))
 	assert.Equal(t, byte(5), seperator32(at(slice(32, 'a'), 5, '\r')))
+	assert.Equal(t, byte(5), seperator32(at(slice(32, 'a'), 5, '?')))
+	assert.Equal(t, byte(32), seperator32(slice(32, '0')))
+	assert.Equal(t, byte(32), seperator32(slice(32, '/'+0x20)))
 }
 
 func slice(l int, v uint8) []uint8 {

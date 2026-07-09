@@ -21,6 +21,13 @@ go get -u github.com/HBTGmbH/gosaxml
 * zero-allocation stream encoding of XML elements (to `io.Writer`)
 * tidying of XML namespace declarations of the encoder input
 
+# Limitations
+
+* CDATA sections are not yet implemented (decoding returns an error)
+* `<!DOCTYPE>` declarations are not supported (decoding returns an error)
+* entity references (like `&amp;`) are not decoded/encoded but passed through verbatim (round-trip-safe)
+* element nesting depth is limited to 255
+
 # Simple examples
 
 ## Decode and re-encode

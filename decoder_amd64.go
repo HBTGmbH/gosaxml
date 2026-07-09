@@ -95,10 +95,10 @@ func (thiz *decoder) decodeTextSSE(t *Token) (bool, error) {
 		j := thiz.r
 		c := 0
 		for thiz.w > thiz.r+c {
-			sidx := openAngleBracket16(thiz.rb[j+c : thiz.w])
-			onlyWhitespaces = onlyWhitespaces && onlySpaces16(thiz.rb[j+c:thiz.w]) >= sidx
-			c += int(sidx)
-			if sidx != 16 {
+			sidx, isWhole := clampToBuf(openAngleBracket16, 16, thiz.rb[j+c:thiz.w])
+			onlyWhitespaces = onlyWhitespaces && int(onlySpaces16(thiz.rb[j+c:thiz.w])) >= sidx
+			c += sidx
+			if !isWhole {
 				_, err := thiz.discard(c)
 				if err != nil {
 					return false, err

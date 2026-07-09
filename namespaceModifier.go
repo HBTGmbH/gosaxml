@@ -16,6 +16,9 @@ type NamespaceModifier struct {
 	namespaces    [][]byte
 	prefixAliases [][]byte
 
+	// backing storage for generated multi-character prefix aliases
+	aliasBuf []byte
+
 	top byte
 
 	PreserveOriginalPrefixes bool
@@ -38,6 +41,7 @@ func (thiz *NamespaceModifier) Reset() {
 	thiz.top = 0
 	thiz.namespaces = thiz.namespaces[:0]
 	thiz.prefixAliases = thiz.prefixAliases[:0]
+	thiz.aliasBuf = thiz.aliasBuf[:0]
 }
 
 // EncodeToken will be called by the Encoder before the provided Token
@@ -55,7 +59,10 @@ func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
 		if err != nil {
 			return err
 		}
-		thiz.processNamespaces(t)
+		err = thiz.processNamespaces(t)
+		if err != nil {
+			return err
+		}
 		thiz.processElementName(t)
 		thiz.openNames[thiz.top] = t.Name
 	} else if t.Kind == TokenTypeEndElement {
@@ -74,6 +81,13 @@ func (thiz *NamespaceModifier) processElementName(t *Token) {
 			// check attributes for rewritten prefixes
 			for i := 0; i < len(t.Attr); i++ {
 				attr := &t.Attr[i]
+				// Unprefixed attributes are never in the default namespace
+				// (https://www.w3.org/TR/xml-names/#defaulting), so a
+				// rewrite of the default namespace to a prefix must not
+				// be applied to them.
+				if len(attr.Name.Prefix) == 0 {
+					continue
+				}
 				prefix := thiz.findPrefixAlias(attr.Name.Prefix)
 				if prefix != nil {
 					attr.Name.Prefix = prefix
@@ -129,7 +143,7 @@ func (thiz *NamespaceModifier) findPrefixAlias(prefix []byte) []byte {
 }
 
 func (thiz *NamespaceModifier) pushFrame() error {
-	if thiz.top >= 255 {
+	if thiz.top == 255 {
 		return errors.New("stack overflow")
 	}
 	thiz.top++
@@ -153,7 +167,7 @@ func (thiz *NamespaceModifier) popFrame() error {
 // processNamespaces scans the attributes of the given token for namespace declarations,
 // either with or without a binding prefix and possibly re-assigns prefixes to other existing
 // or new aliases and drops redundant namespace declarations.
-func (thiz *NamespaceModifier) processNamespaces(t *Token) {
+func (thiz *NamespaceModifier) processNamespaces(t *Token) error {
 	j := 0
 	for i := 0; i < len(t.Attr); i++ {
 		attr := &t.Attr[i]
@@ -173,8 +187,10 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 			}
 			if !thiz.PreserveOriginalPrefixes {
 				// wo don't know the prefix, but we want to rewrite it
-				nextPrefixAlias := len(thiz.prefixAliases) / 2
-				c := namespaceAliases[nextPrefixAlias : nextPrefixAlias+1]
+				c, err := thiz.nextPrefixAlias()
+				if err != nil {
+					return err
+				}
 				thiz.addPrefixRewrite(attr.Name.Local, c)
 				thiz.addNamespaceBinding(c, attr.Value)
 				attr.Name.Local = c
@@ -185,7 +201,7 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 			// check if the element is already in that namespace, in which case
 			// we can simply omit the namespace.
 			currentNamespace := thiz.findNamespaceForPrefix(nil)
-			if currentNamespace != nil {
+			if currentNamespace != nil && bytes.Equal(currentNamespace, attr.Value) {
 				continue
 			}
 			// check if we already know a prefix for that namespace so that we
@@ -208,6 +224,24 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) {
 		j++
 	}
 	t.Attr = t.Attr[:j]
+	return nil
+}
+
+// nextPrefixAlias generates the next unused namespace prefix alias:
+// first the single letters "a".."z", then the two-letter
+// combinations "aa".."zz".
+func (thiz *NamespaceModifier) nextPrefixAlias() ([]byte, error) {
+	n := len(thiz.prefixAliases) / 2
+	if n < len(namespaceAliases) {
+		return namespaceAliases[n : n+1], nil
+	}
+	n -= len(namespaceAliases)
+	if n >= len(namespaceAliases)*len(namespaceAliases) {
+		return nil, errors.New("too many namespace prefixes in scope")
+	}
+	i := len(thiz.aliasBuf)
+	thiz.aliasBuf = append(thiz.aliasBuf, namespaceAliases[n/len(namespaceAliases)], namespaceAliases[n%len(namespaceAliases)])
+	return thiz.aliasBuf[i : i+2], nil
 }
 
 func (thiz *NamespaceModifier) addNamespaceBinding(prefix, namespace []byte) {

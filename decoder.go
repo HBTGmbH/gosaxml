@@ -27,14 +27,15 @@ type Decoder interface {
 type decoder struct {
 	rb                  [2048]byte
 	bbOffset            [256]int32
-	numAttributes       [256]byte
+	numAttributes       [256]int32
 	lastOpen            Name
-	preserveWhitespaces [32]bool
+	preserveWhitespaces [256]bool
 	rd                  io.Reader
 	bb                  []byte
 	attrs               []Attr
 	r                   int
 	w                   int
+	off                 int
 	top                 byte
 	lastStartElement    bool
 }
@@ -62,6 +63,7 @@ func isWhitespace(b byte) bool {
 func (thiz *decoder) read0() error {
 	if thiz.r > 0 {
 		copy(thiz.rb[:], thiz.rb[thiz.r:thiz.w])
+		thiz.off += thiz.r
 		thiz.w -= thiz.r
 		thiz.r = 0
 	}
@@ -105,16 +107,19 @@ func (thiz *decoder) discard(n int) (int, error) {
 }
 
 func (thiz *decoder) InputOffset() int {
-	return thiz.r
+	return thiz.off + thiz.r
 }
 
 func (thiz *decoder) Reset(r io.Reader) {
 	thiz.rd = r
 	thiz.r = 0
 	thiz.w = 0
+	thiz.off = 0
 	thiz.attrs = thiz.attrs[:0]
 	thiz.bb = thiz.bb[:0]
 	thiz.top = 0
+	thiz.lastOpen = Name{}
+	thiz.preserveWhitespaces = [256]bool{}
 	thiz.lastStartElement = false
 }
 
@@ -171,8 +176,11 @@ func (thiz *decoder) NextToken(t *Token) error {
 			case '?':
 				thiz.lastStartElement = false
 				err = thiz.decodeProcInst(t)
+				if err != nil {
+					return err
+				}
 				thiz.unreadByte()
-				return err
+				return nil
 			case '!':
 				// CDATA or comment
 				b, err = thiz.readByte()
@@ -307,6 +315,9 @@ func (thiz *decoder) ignoreComment() error {
 }
 
 func (thiz *decoder) decodeEndElement(t *Token, name Name) error {
+	if thiz.top == 0 {
+		return errors.New("unexpected end element without matching start element")
+	}
 	end := len(thiz.attrs) - int(thiz.numAttributes[thiz.top])
 	thiz.attrs = thiz.attrs[0:end]
 	thiz.bb = thiz.bb[:thiz.bbOffset[thiz.top]]
@@ -317,10 +328,15 @@ func (thiz *decoder) decodeEndElement(t *Token, name Name) error {
 }
 
 func (thiz *decoder) decodeStartElement(t *Token) error {
+	if thiz.top == 255 {
+		return errors.New("element nesting depth exceeds 255")
+	}
 	thiz.top++
 	thiz.numAttributes[thiz.top] = 0
 	thiz.bbOffset[thiz.top] = int32(len(thiz.bb))
-	thiz.preserveWhitespaces[thiz.top+1] = thiz.preserveWhitespaces[thiz.top]
+	// inherit xml:space handling from the parent element (may be
+	// overridden by an xml:space attribute in decodeAttribute)
+	thiz.preserveWhitespaces[thiz.top] = thiz.preserveWhitespaces[thiz.top-1]
 	thiz.unreadByte()
 	name, b, err := thiz.readName()
 	if err != nil {
@@ -402,8 +418,8 @@ func (thiz *decoder) readName() (Name, byte, error) {
 
 var seps = generateTable()
 
-func generateTable() ['>' + 1]bool {
-	var s ['>' + 1]bool
+func generateTable() ['?' + 1]bool {
+	var s ['?' + 1]bool
 	s['\t'] = true
 	s['\n'] = true
 	s['\r'] = true
@@ -412,6 +428,7 @@ func generateTable() ['>' + 1]bool {
 	s[':'] = true
 	s['='] = true
 	s['>'] = true
+	s['?'] = true
 	return s
 }
 
@@ -455,7 +472,7 @@ func (thiz *decoder) decodeAttributes(b byte) ([]Attr, error) {
 			return thiz.attrs[i:len(thiz.attrs)], nil
 		default:
 			i := len(thiz.attrs)
-			thiz.attrs = thiz.attrs[:i+1]
+			thiz.attrs = append(thiz.attrs, Attr{})
 			err = thiz.decodeAttribute(&thiz.attrs[i])
 			if err != nil {
 				return nil, err
