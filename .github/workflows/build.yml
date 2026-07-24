@@ -22,12 +22,18 @@ jobs:
           persist-credentials: false
       - uses: reviewdog/action-golangci-lint@c76cceaaab89abe74e649d2e34c6c9adc26662d2 # v2.10.0
         with:
-          fail_on_error: true
+          fail_level: any
       - run: |
-          gofmt -l . && test -z $(gofmt -l .)
+          gofmt -l . && test -z "$(gofmt -l .)"
           go vet .
           go install github.com/mgechev/revive@latest
-          revive -config revive.toml .
+          # revive type-checks the files it is given as a single package and takes
+          # the package name from an arbitrary one of them (Go map iteration order).
+          # Passing a directory that mixes `gosaxml` and `gosaxml_test` files
+          # therefore makes findings appear only about half the time, so pass each
+          # package clause as its own file set.
+          go list -f '{{range .GoFiles}}{{.}} {{end}}{{range .TestGoFiles}}{{.}} {{end}}' . | xargs -r revive -config revive.toml
+          go list -f '{{range .XTestGoFiles}}{{.}} {{end}}' . | xargs -r revive -config revive.toml
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15

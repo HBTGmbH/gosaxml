@@ -63,10 +63,10 @@ func roundTrip(t *testing.T, input string) (string, error) {
 func nestedDocument(depth int) string {
 	var b strings.Builder
 	for i := 0; i < depth; i++ {
-		fmt.Fprintf(&b, "<e%d>", i)
+		_, _ = fmt.Fprintf(&b, "<e%d>", i)
 	}
 	for i := depth - 1; i >= 0; i-- {
-		fmt.Fprintf(&b, "</e%d>", i)
+		_, _ = fmt.Fprintf(&b, "</e%d>", i)
 	}
 	return b.String()
 }
@@ -84,11 +84,11 @@ func TestNestingDepthLimit(t *testing.T) {
 
 func TestMoreThan256Attributes(t *testing.T) {
 	var b strings.Builder
-	b.WriteString("<a")
+	_, _ = b.WriteString("<a")
 	for i := 0; i < 300; i++ {
-		fmt.Fprintf(&b, ` a%d="v"`, i)
+		_, _ = fmt.Fprintf(&b, ` a%d="v"`, i)
 	}
-	b.WriteString("/>")
+	_, _ = b.WriteString("/>")
 	dec := gosaxml.NewDecoder(strings.NewReader(b.String()))
 	var tk gosaxml.Token
 	err := dec.NextToken(&tk)
@@ -99,11 +99,11 @@ func TestMoreThan256Attributes(t *testing.T) {
 
 func TestMoreThan26NamespacePrefixes(t *testing.T) {
 	var b strings.Builder
-	b.WriteString("<a")
+	_, _ = b.WriteString("<a")
 	for i := 0; i < 30; i++ {
-		fmt.Fprintf(&b, ` xmlns:p%d="ns%d"`, i, i)
+		_, _ = fmt.Fprintf(&b, ` xmlns:p%d="ns%d"`, i, i)
 	}
-	b.WriteString("/>")
+	_, _ = b.WriteString("/>")
 	out, err := roundTrip(t, b.String())
 	assert.Nil(t, err)
 	assert.Contains(t, out, `xmlns:z="ns25"`)
@@ -165,11 +165,11 @@ func TestXmlSpacePreserveClearedByReset(t *testing.T) {
 
 func TestInputOffsetLargerThanReadBuffer(t *testing.T) {
 	var b strings.Builder
-	b.WriteString("<a>")
+	_, _ = b.WriteString("<a>")
 	for i := 0; i < 300; i++ {
-		b.WriteString("<x>0123456789</x>")
+		_, _ = b.WriteString("<x>0123456789</x>")
 	}
-	b.WriteString("</a>")
+	_, _ = b.WriteString("</a>")
 	input := b.String()
 	dec := gosaxml.NewDecoder(strings.NewReader(input))
 	var tk gosaxml.Token

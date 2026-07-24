@@ -54,7 +54,8 @@ func (thiz *NamespaceModifier) Reset() {
 // their values until after its corresponding TokenTypeEndElement is processed
 // by the EncoderMiddleware.
 func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
-	if t.Kind == TokenTypeStartElement {
+	switch t.Kind {
+	case TokenTypeStartElement:
 		err := thiz.pushFrame()
 		if err != nil {
 			return err
@@ -65,7 +66,7 @@ func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
 		}
 		thiz.processElementName(t)
 		thiz.openNames[thiz.top] = t.Name
-	} else if t.Kind == TokenTypeEndElement {
+	case TokenTypeEndElement:
 		thiz.processElementName(t)
 		err := thiz.popFrame()
 		if err != nil {
