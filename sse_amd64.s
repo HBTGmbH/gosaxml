@@ -1,11 +1,5 @@
 #include "textflag.h"
 
-DATA ·oab<>+0(SB)/8, $0x3C3C3C3C3C3C3C3C
-DATA ·oab<>+8(SB)/8, $0x3C3C3C3C3C3C3C3C
-DATA ·oab<>+16(SB)/8, $0x3C3C3C3C3C3C3C3C
-DATA ·oab<>+24(SB)/8, $0x3C3C3C3C3C3C3C3C
-GLOBL ·oab<>(SB), NOPTR+RODATA, $32
-
 DATA ·spc<>+0(SB)/8, $0x2020202020202020
 DATA ·spc<>+8(SB)/8, $0x2020202020202020
 DATA ·spc<>+16(SB)/8, $0x2020202020202020
@@ -29,25 +23,6 @@ DATA ·hi_nibbles<>+8(SB)/8, $0x0000000000000000
 DATA ·hi_nibbles<>+16(SB)/8, $0x000000000F1800E0
 DATA ·hi_nibbles<>+24(SB)/8, $0x0000000000000000
 GLOBL ·hi_nibbles<>(SB), NOPTR+RODATA, $32
-
-TEXT ·openAngleBracket16(SB),NOSPLIT, $0
-    MOVQ arg+0(FP), DI
-    MOVOU (DI), X0
-    PCMPEQB ·oab<>(SB), X0
-    PMOVMSKB X0, AX
-    TZCNTW AX, AX
-    MOVB AX, ret+24(FP)
-    RET
-
-TEXT ·openAngleBracket32(SB),NOSPLIT, $0
-    MOVQ arg+0(FP), DI
-    VMOVDQU (DI), Y0
-    VPCMPEQB ·oab<>(SB), Y0, Y0
-    VPMOVMSKB Y0, AX
-    TZCNTL AX, AX
-    MOVB AX, ret+24(FP)
-    VZEROUPPER // <- https://i.stack.imgur.com/dGpbi.png
-    RET
 
 TEXT ·onlySpaces16(SB),NOSPLIT, $0
     MOVQ arg+0(FP), DI

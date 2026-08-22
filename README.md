@@ -20,6 +20,8 @@ go get -u github.com/HBTGmbH/gosaxml
 * zero-allocation stream decoding of XML inputs (from `io.Reader`)
 * zero-allocation stream encoding of XML elements (to `io.Writer`)
 * tidying of XML namespace declarations of the encoder input
+* SIMD-accelerated scanning on amd64 (SSE2/AVX2) and arm64 (NEON), with a portable
+  fallback on every other architecture
 
 # Limitations
 

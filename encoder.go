@@ -11,8 +11,6 @@ var (
 	namespaceAliases = []byte("abcdefghijklmnopqrstuvwxyz")
 
 	// constant strings needed here and there
-	slashAngleClose = []byte("/>")
-	angleOpenSlash  = []byte("</")
 	angleOpenQuest  = []byte("<?")
 	questAngleClose = []byte("?>")
 )
@@ -38,6 +36,14 @@ type EncoderMiddleware interface {
 	Reset()
 }
 
+// encodeBufferSize is the initial size of the Encoder's output buffer.
+const encodeBufferSize = 8192
+
+// encodeBlock is the block size used by appendBlock. Every reservation asks
+// for one block of headroom on top of the bytes it actually needs, so that
+// the block copies do not fall back to memmove at the end of the buffer.
+const encodeBlock = 32
+
 // Encoder encodes Token values to an io.Writer.
 type Encoder struct {
 	// buffers writes to the underlying io.Writer
@@ -58,7 +64,7 @@ type Encoder struct {
 // NewEncoder creates a new Encoder with the given middlewares and returns a pointer to it.
 func NewEncoder(w io.Writer, middlewares ...EncoderMiddleware) *Encoder {
 	return &Encoder{
-		buf:         make([]byte, 0, 2048),
+		buf:         make([]byte, 0, encodeBufferSize),
 		wr:          w,
 		middlewares: middlewares,
 	}
@@ -68,31 +74,39 @@ func NewEncoder(w io.Writer, middlewares ...EncoderMiddleware) *Encoder {
 // It must be called after token encoding is done in order
 // to write all remaining bytes into the io.Writer.
 func (thiz *Encoder) Flush() error {
+	if len(thiz.buf) == 0 {
+		return nil
+	}
 	_, err := thiz.wr.Write(thiz.buf)
 	thiz.buf = thiz.buf[:0]
 	return err
 }
 
-func (thiz *Encoder) write(b byte) error {
-	if len(thiz.buf)+1 >= cap(thiz.buf) {
-		err := thiz.Flush()
-		if err != nil {
-			return err
-		}
+// reserve makes sure that at least n more bytes can be appended to the
+// output buffer without it having to grow, flushing (and, if a single token
+// is larger than the whole buffer, growing) as needed.
+// Reserving up-front lets the actual encoding be a straight run of appends
+// with no per-write flush checks.
+func (thiz *Encoder) reserve(n int) error {
+	if len(thiz.buf)+n+encodeBlock <= cap(thiz.buf) {
+		return nil
 	}
-	thiz.buf = append(thiz.buf, b)
-	return nil
+	return thiz.reserveSlow(n)
 }
 
-func (thiz *Encoder) writeBytes(bs []byte) error {
-	l := len(bs)
-	if len(thiz.buf)+l >= cap(thiz.buf) {
-		err := thiz.Flush()
-		if err != nil {
-			return err
-		}
+func (thiz *Encoder) reserveSlow(n int) error {
+	err := thiz.Flush()
+	if err != nil {
+		return err
 	}
-	thiz.buf = append(thiz.buf, bs...)
+	n += encodeBlock
+	if n > cap(thiz.buf) {
+		c := cap(thiz.buf) * 2
+		for c < n {
+			c *= 2
+		}
+		thiz.buf = make([]byte, 0, c)
+	}
 	return nil
 }
 
@@ -112,8 +126,6 @@ func (thiz *Encoder) Reset(w io.Writer) {
 // of this Encoder.
 func (thiz *Encoder) EncodeToken(t *Token) error {
 	switch t.Kind {
-	case TokenTypeInvalid:
-		return errors.New("trying to encode invalid/zerovalue token")
 	case TokenTypeStartElement:
 		err := thiz.encodeStartElement(t)
 		if err != nil {
@@ -127,13 +139,13 @@ func (thiz *Encoder) EncodeToken(t *Token) error {
 		}
 		thiz.lastStartElement = false
 	case TokenTypeTextElement:
-		err := thiz.encodeTextElement(t)
+		err := thiz.encodeBytes(t.ByteData)
 		if err != nil {
 			return err
 		}
 		thiz.lastStartElement = false
 	case TokenTypeDirective:
-		err := thiz.encodeDirective(t)
+		err := thiz.encodeBytes(t.ByteData)
 		if err != nil {
 			return err
 		}
@@ -144,6 +156,8 @@ func (thiz *Encoder) EncodeToken(t *Token) error {
 			return err
 		}
 		thiz.lastStartElement = false
+	case TokenTypeInvalid:
+		return errors.New("trying to encode invalid/zerovalue token")
 	default:
 		thiz.lastStartElement = false
 		return errors.New("NYI")
@@ -151,47 +165,104 @@ func (thiz *Encoder) EncodeToken(t *Token) error {
 	return nil
 }
 
+// appendBlock appends src to dst with a fixed-size block copy that the
+// compiler expands inline, and reports whether it could. It declines when the
+// block would not fit into either slice, in which case the caller falls back
+// to a plain append.
+//
+// XML names and attribute values are short, and for those this saves the
+// runtime.memmove call that a variable-length copy compiles to. Reading a
+// whole block out of src is safe because src is required to have the capacity
+// for it; the surplus bytes are cut away again by re-slicing.
+func appendBlock(dst, src []byte) ([]byte, bool) {
+	l := len(dst)
+	if len(src) > encodeBlock || l+encodeBlock > cap(dst) || cap(src) < encodeBlock {
+		return dst, false
+	}
+	d := dst[:l+encodeBlock]
+	*(*[encodeBlock]byte)(d[l:]) = *(*[encodeBlock]byte)(src[:encodeBlock])
+	return d[:l+len(src)], true
+}
+
+// appendVar appends src to dst, using a block copy where possible.
+func appendVar(dst, src []byte) []byte {
+	if d, ok := appendBlock(dst, src); ok {
+		return d
+	}
+	return append(dst, src...)
+}
+
+// nameLen returns the number of bytes that appendName will write for n.
+// A non-nil (even if empty) prefix is written, followed by ':'.
+func nameLen(n Name) int {
+	l := len(n.Local)
+	if n.Prefix != nil {
+		l += len(n.Prefix) + 1
+	}
+	return l
+}
+
+// appendName appends the (possibly prefixed) name to buf.
+// The caller must have reserved nameLen(n) bytes.
+//
+// The hot encoding paths spell this out instead of calling it, so that
+// appendVar — and with it the block copy — inlines into them.
+func appendName(buf []byte, n Name) []byte {
+	if n.Prefix != nil {
+		buf = appendVar(buf, n.Prefix)
+		buf = append(buf, ':')
+	}
+	return appendVar(buf, n.Local)
+}
+
 func (thiz *Encoder) encodeStartElement(t *Token) error {
-	err := thiz.endLastStartElement()
-	if err != nil {
-		return err
-	}
-	err = thiz.write('<')
-	if err != nil {
-		return err
-	}
-
-	err = thiz.callMiddlewares(t)
+	// Middlewares only rewrite the token, they never write output, so they
+	// can run before we size and emit the element.
+	err := thiz.callMiddlewares(t)
 	if err != nil {
 		return err
 	}
 
-	// write element name
-	err = thiz.writeName(t.Name)
+	// ">" of the pending start element + "<" + name
+	n := 2 + nameLen(t.Name)
+	attrs := t.Attr
+	for i := 0; i < len(attrs); i++ {
+		attr := &attrs[i]
+		// ' ' + name + '=' + quote + value + quote
+		n += 4 + nameLen(attr.Name) + len(attr.Value)
+	}
+	err = thiz.reserve(n)
 	if err != nil {
 		return err
 	}
 
-	// write attributes
-	for i := 0; i < len(t.Attr); i++ {
-		attr := &t.Attr[i]
-		err = thiz.write(' ')
-		if err != nil {
-			return err
-		}
-		err = thiz.writeName(attr.Name)
-		if err != nil {
-			return err
-		}
-		err = thiz.write('=')
-		if err != nil {
-			return err
-		}
-		err = thiz.writeString(attr.Value, attr.SingleQuote)
-		if err != nil {
-			return err
-		}
+	buf := thiz.buf
+	if thiz.lastStartElement {
+		buf = append(buf, '>')
 	}
+	buf = append(buf, '<')
+	if t.Name.Prefix != nil {
+		buf = appendVar(buf, t.Name.Prefix)
+		buf = append(buf, ':')
+	}
+	buf = appendVar(buf, t.Name.Local)
+	for i := 0; i < len(attrs); i++ {
+		attr := &attrs[i]
+		buf = append(buf, ' ')
+		if attr.Name.Prefix != nil {
+			buf = appendVar(buf, attr.Name.Prefix)
+			buf = append(buf, ':')
+		}
+		buf = appendVar(buf, attr.Name.Local)
+		q := byte('"')
+		if attr.SingleQuote {
+			q = '\''
+		}
+		buf = append(buf, '=', q)
+		buf = appendVar(buf, attr.Value)
+		buf = append(buf, q)
+	}
+	thiz.buf = buf
 
 	// DO NOT write the ending ">" character, because the element
 	// could get closed right away with the next EndElement token.
@@ -203,10 +274,11 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if thiz.lastStartElement {
 		// the last seen token was a StartElement, so this
 		// token can only be its accompanying EndElement.
-		err := thiz.writeBytes(slashAngleClose)
+		err := thiz.reserve(2)
 		if err != nil {
 			return err
 		}
+		thiz.buf = append(thiz.buf, '/', '>')
 		return thiz.callMiddlewares(t)
 	}
 
@@ -214,25 +286,23 @@ func (thiz *Encoder) encodeEndElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	err = thiz.writeBytes(angleOpenSlash)
+	err = thiz.reserve(3 + nameLen(t.Name))
 	if err != nil {
 		return err
 	}
-	err = thiz.writeName(t.Name)
-	if err != nil {
-		return err
+	buf := append(thiz.buf, '<', '/')
+	if t.Name.Prefix != nil {
+		buf = appendVar(buf, t.Name.Prefix)
+		buf = append(buf, ':')
 	}
-	err = thiz.write('>')
-	if err != nil {
-		return err
-	}
+	buf = appendVar(buf, t.Name.Local)
+	thiz.buf = append(buf, '>')
 	return nil
 }
 
 func (thiz *Encoder) callMiddlewares(t *Token) error {
-	var err error
 	for _, middleware := range thiz.middlewares {
-		err = middleware.EncodeToken(t)
+		err := middleware.EncodeToken(t)
 		if err != nil {
 			return err
 		}
@@ -240,91 +310,33 @@ func (thiz *Encoder) callMiddlewares(t *Token) error {
 	return nil
 }
 
-func (thiz *Encoder) writeName(n Name) error {
-	var err error
-	if n.Prefix != nil {
-		err = thiz.writeBytes(n.Prefix)
-		if err != nil {
-			return err
-		}
-		err = thiz.write(':')
-		if err != nil {
-			return err
-		}
-	}
-	return thiz.writeBytes(n.Local)
-}
-
-func (thiz *Encoder) writeString(s []byte, useSingleQuote bool) error {
-	var err error
-	if useSingleQuote {
-		err = thiz.write('\'')
-	} else {
-		err = thiz.write('"')
-	}
+// encodeBytes ends a pending start element and then writes bs verbatim.
+func (thiz *Encoder) encodeBytes(bs []byte) error {
+	err := thiz.reserve(len(bs) + 1)
 	if err != nil {
 		return err
 	}
-	err = thiz.writeBytes(s)
-	if err != nil {
-		return err
-	}
-	if useSingleQuote {
-		err = thiz.write('\'')
-	} else {
-		err = thiz.write('"')
-	}
-	return err
-}
-
-func (thiz *Encoder) encodeTextElement(t *Token) error {
-	err := thiz.endLastStartElement()
-	if err != nil {
-		return err
-	}
-	return thiz.writeBytes(t.ByteData)
-}
-
-func (thiz *Encoder) endLastStartElement() error {
+	buf := thiz.buf
 	if thiz.lastStartElement {
-		// end the last StartElement with its ">"
-		err := thiz.write('>')
-		if err != nil {
-			return err
-		}
+		buf = append(buf, '>')
 	}
+	thiz.buf = appendVar(buf, bs)
 	return nil
-}
-
-func (thiz *Encoder) encodeDirective(t *Token) error {
-	err := thiz.endLastStartElement()
-	if err != nil {
-		return err
-	}
-	return thiz.writeBytes(t.ByteData)
 }
 
 func (thiz *Encoder) encodeProcInst(t *Token) error {
-	err := thiz.endLastStartElement()
+	err := thiz.reserve(6 + nameLen(t.Name) + len(t.ByteData))
 	if err != nil {
 		return err
 	}
-	err = thiz.writeBytes(angleOpenQuest)
-	if err != nil {
-		return err
+	buf := thiz.buf
+	if thiz.lastStartElement {
+		buf = append(buf, '>')
 	}
-	err = thiz.writeName(t.Name)
-	if err != nil {
-		return err
-	}
-	err = thiz.write(' ')
-	if err != nil {
-		return err
-	}
-	err = thiz.writeBytes(t.ByteData)
-	if err != nil {
-		return err
-	}
-	err = thiz.writeBytes(questAngleClose)
-	return err
+	buf = append(buf, angleOpenQuest...)
+	buf = appendName(buf, t.Name)
+	buf = append(buf, ' ')
+	buf = append(buf, t.ByteData...)
+	thiz.buf = append(buf, questAngleClose...)
+	return nil
 }
