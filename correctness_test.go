@@ -31,6 +31,8 @@ func collectTokens(t *testing.T, input string) ([]string, error) {
 			tokens = append(tokens, "end:"+string(tk.Name.Local))
 		case gosaxml.TokenTypeTextElement:
 			tokens = append(tokens, "text:"+string(tk.ByteData))
+		case gosaxml.TokenTypeCharData:
+			tokens = append(tokens, "chardata:"+string(tk.ByteData))
 		case gosaxml.TokenTypeProcInst:
 			tokens = append(tokens, "pi:"+string(tk.Name.Local))
 		}
@@ -211,4 +213,94 @@ func TestRetryAfterErrorDoesNotPanic(t *testing.T) {
 	assert.NotPanics(t, func() {
 		_ = dec.NextToken(&tk)
 	})
+}
+
+func TestCDataSectionIsDecodedAsCharData(t *testing.T) {
+	tokens, err := collectTokens(t, "<a><![CDATA[x < y & z]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "chardata:x < y & z", "end:a"}, tokens)
+}
+
+func TestCDataSectionMayContainMarkup(t *testing.T) {
+	tokens, err := collectTokens(t, "<a><![CDATA[<b>not an element</b>]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "chardata:<b>not an element</b>", "end:a"}, tokens)
+}
+
+func TestCDataSectionMayContainTwoBrackets(t *testing.T) {
+	tokens, err := collectTokens(t, "<a><![CDATA[a]]b]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "chardata:a]]b", "end:a"}, tokens)
+}
+
+func TestCDataSectionMayEndWithABracket(t *testing.T) {
+	tokens, err := collectTokens(t, "<a><![CDATA[a]]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "chardata:a]", "end:a"}, tokens)
+}
+
+func TestEmptyCDataSection(t *testing.T) {
+	tokens, err := collectTokens(t, "<a><![CDATA[]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "chardata:", "end:a"}, tokens)
+}
+
+func TestCDataSectionKeepsWhitespaceOnlyContent(t *testing.T) {
+	tokens, err := collectTokens(t, "<a><![CDATA[   ]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "chardata:   ", "end:a"}, tokens)
+}
+
+func TestCDataSectionLargerThanTheReadBuffer(t *testing.T) {
+	content := strings.Repeat("abc]]", 10000)
+	tokens, err := collectTokens(t, "<a><![CDATA["+content+"]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "chardata:" + content, "end:a"}, tokens)
+}
+
+func TestUnterminatedCDataSectionIsAnError(t *testing.T) {
+	_, err := collectTokens(t, "<a><![CDATA[never closed</a>")
+	assert.EqualError(t, err, "invalid XML: unterminated CDATA section")
+}
+
+func TestSectionOtherThanCDataIsAnError(t *testing.T) {
+	_, err := collectTokens(t, "<a><![FOO[bar]]></a>")
+	assert.EqualError(t, err, "invalid XML: expected CDATA section")
+}
+
+func TestTextAroundACDataSection(t *testing.T) {
+	tokens, err := collectTokens(t, "<a>before<![CDATA[middle]]>after</a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "text:before", "chardata:middle", "text:after", "end:a"}, tokens)
+}
+
+func TestTwoCDataSectionsInARow(t *testing.T) {
+	tokens, err := collectTokens(t, "<a><![CDATA[one]]><![CDATA[two]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:a", "chardata:one", "chardata:two", "end:a"}, tokens)
+}
+
+func TestCDataSectionSurvivesARoundTrip(t *testing.T) {
+	out, err := roundTrip(t, "<a><![CDATA[x < y & z]]></a>")
+	assert.Nil(t, err)
+	assert.Equal(t, "<a><![CDATA[x < y & z]]></a>", out)
+}
+
+func TestEncodingCDataSplitsAnEmbeddedDelimiter(t *testing.T) {
+	// A CDATA section cannot contain "]]>". A token carrying one must be
+	// written as two sections, or the output is not well-formed.
+	var w bytes.Buffer
+	enc := gosaxml.NewEncoder(&w)
+	err := enc.EncodeToken(&gosaxml.Token{
+		Kind:     gosaxml.TokenTypeCharData,
+		ByteData: []byte("a]]>b"),
+	})
+	assert.Nil(t, err)
+	assert.Nil(t, enc.Flush())
+	assert.Equal(t, "<![CDATA[a]]]]><![CDATA[>b]]>", w.String())
+
+	// and the result must decode back to the original text
+	tokens, err := collectTokens(t, "<r>"+w.String()+"</r>")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"start:r", "chardata:a]]", "chardata:>b", "end:r"}, tokens)
 }
