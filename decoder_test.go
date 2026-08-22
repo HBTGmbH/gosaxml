@@ -307,3 +307,27 @@ func endElementWithPrefix(prefix, local string) gosaxml.Token {
 		},
 	}
 }
+
+func BenchmarkNextTokenCDATA(b *testing.B) {
+	// given
+	doc := "<a><![CDATA[" + strings.Repeat("some text with ] and ]] in it", 1000) + "]]></a>"
+	r := strings.NewReader(doc)
+	dec := gosaxml.NewDecoder(r)
+
+	b.SetBytes(int64(len(doc)))
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		r.Reset(doc)
+		dec.Reset(r)
+		var tk gosaxml.Token
+		for {
+			err := dec.NextToken(&tk)
+			if err == io.EOF {
+				break
+			}
+			assert.Nil(b, err)
+		}
+	}
+}

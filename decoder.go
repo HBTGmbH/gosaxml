@@ -195,7 +195,7 @@ func (thiz *decoder) NextToken(t *Token) error {
 					}
 				case '[':
 					thiz.lastStartElement = false
-					return thiz.readCDATA()
+					return thiz.readCDATA(t)
 				default:
 					return errors.New("invalid XML: comment or CDATA expected")
 				}
@@ -386,13 +386,59 @@ func (thiz *decoder) decodeTextGeneric(t *Token) (bool, error) {
 	}
 }
 
-func (thiz *decoder) readCDATA() error {
-	// discard "CDATA["
-	_, err := thiz.discard(6)
+var (
+	errCDATAExpected     = errors.New("invalid XML: expected CDATA section")
+	errCDATAUnterminated = errors.New("invalid XML: unterminated CDATA section")
+	cdataPrefix          = []byte("CDATA[")
+)
+
+// readCDATA reads a CDATA section into t, without its "<![CDATA[" and "]]>"
+// delimiters. The caller has consumed "<![".
+func (thiz *decoder) readCDATA(t *Token) error {
+	for thiz.r+len(cdataPrefix) > thiz.w {
+		if err := thiz.read0(); err != nil {
+			return errCDATAExpected
+		}
+	}
+	if !bytes.Equal(thiz.rb[thiz.r:thiz.r+len(cdataPrefix)], cdataPrefix) {
+		return errCDATAExpected
+	}
+	_, err := thiz.discard(len(cdataPrefix))
 	if err != nil {
 		return err
 	}
-	return errors.New("NYI")
+	i := len(thiz.bb)
+	for {
+		j := thiz.r
+		// The section ends at the first ">" preceded by "]]". Because the
+		// delimiter can straddle a buffer boundary, look for it in the
+		// collected bytes rather than in the read buffer.
+		k := bytes.IndexByte(thiz.rb[j:thiz.w], '>')
+		if k < 0 {
+			thiz.bb = append(thiz.bb, thiz.rb[j:thiz.w]...)
+			thiz.discardBuffer()
+			err = thiz.read0()
+			if err != nil {
+				if err == io.EOF {
+					return errCDATAUnterminated
+				}
+				return err
+			}
+			continue
+		}
+		thiz.bb = append(thiz.bb, thiz.rb[j:j+k+1]...)
+		_, err = thiz.discard(k + 1)
+		if err != nil {
+			return err
+		}
+		n := len(thiz.bb)
+		if n-i >= len(cdataEnd) && bytes.Equal(thiz.bb[n-len(cdataEnd):], cdataEnd) {
+			thiz.bb = thiz.bb[:n-len(cdataEnd)]
+			t.Kind = TokenTypeCharData
+			t.ByteData = thiz.bb[i:]
+			return nil
+		}
+	}
 }
 
 func (thiz *decoder) readName() (Name, byte, error) {

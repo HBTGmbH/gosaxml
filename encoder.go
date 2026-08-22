@@ -1,6 +1,7 @@
 package gosaxml
 
 import (
+	"bytes"
 	"errors"
 	"io"
 )
@@ -144,6 +145,12 @@ func (thiz *Encoder) EncodeToken(t *Token) error {
 			return err
 		}
 		thiz.lastStartElement = false
+	case TokenTypeCharData:
+		err := thiz.encodeCharData(t)
+		if err != nil {
+			return err
+		}
+		thiz.lastStartElement = false
 	default:
 		thiz.lastStartElement = false
 		return errors.New("NYI")
@@ -283,6 +290,51 @@ func (thiz *Encoder) encodeTextElement(t *Token) error {
 		return err
 	}
 	return thiz.writeBytes(t.ByteData)
+}
+
+var (
+	cdataStart = []byte("<![CDATA[")
+	cdataEnd   = []byte("]]>")
+)
+
+// encodeCharData writes the token back as a CDATA section, so that a
+// document decoded and encoded again keeps its CDATA sections.
+func (thiz *Encoder) encodeCharData(t *Token) error {
+	err := thiz.endLastStartElement()
+	if err != nil {
+		return err
+	}
+	err = thiz.writeBytes(cdataStart)
+	if err != nil {
+		return err
+	}
+	// A CDATA section cannot contain "]]>". Split the data into as many
+	// sections as needed, keeping the text itself unchanged.
+	data := t.ByteData
+	for {
+		k := bytes.Index(data, cdataEnd)
+		if k < 0 {
+			break
+		}
+		err = thiz.writeBytes(data[:k+2])
+		if err != nil {
+			return err
+		}
+		err = thiz.writeBytes(cdataEnd)
+		if err != nil {
+			return err
+		}
+		err = thiz.writeBytes(cdataStart)
+		if err != nil {
+			return err
+		}
+		data = data[k+2:]
+	}
+	err = thiz.writeBytes(data)
+	if err != nil {
+		return err
+	}
+	return thiz.writeBytes(cdataEnd)
 }
 
 func (thiz *Encoder) endLastStartElement() error {
