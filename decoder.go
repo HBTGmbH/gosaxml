@@ -440,8 +440,10 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 	if err != nil {
 		return err
 	}
-	err = thiz.decodeAttributes(b, t)
-	if err != nil {
+	if b == '>' || b == '/' {
+		// no attributes: spare the call into decodeAttributes
+		thiz.endStartElement(b, t, len(thiz.attrs))
+	} else if err = thiz.decodeAttributes(b, t); err != nil {
 		return err
 	}
 	if thiz.pendingSelfClose {
@@ -764,37 +766,61 @@ func (thiz *decoder) skipWhitespacesSlow() (byte, error) {
 	}
 }
 
+// endStartElement completes t once the "/" or ">" that ends its start tag has
+// been consumed; i is the index of its first attribute in thiz.attrs.
+//
+// The terminator is consumed right away instead of being read and dispatched
+// on again by the next NextToken call. A "/" leaves an EndElement pending;
+// offAdjust keeps InputOffset reporting the terminator's own position in the
+// meantime.
+func (thiz *decoder) endStartElement(b byte, t *Token, i int) {
+	thiz.offAdjust = -1
+	thiz.pendingSelfClose = b == '/'
+	t.Attr = thiz.attrs[i:]
+}
+
 // decodeAttributes parses the attributes of a start element and stores them
-// in t.Attr. b is the byte that terminated the element name.
+// in t.Attr. b is the byte that terminated the element name, which has been
+// consumed.
+//
+// Each attribute's first byte is left unread for decodeAttribute rather than
+// consumed and given back, which would cost a store/load round trip of
+// thiz.r per attribute.
 func (thiz *decoder) decodeAttributes(b byte, t *Token) error {
 	i := len(thiz.attrs)
-	for {
-		if b <= ' ' {
-			// Find the next significant byte. Doing the scan here rather
-			// than through readByte plus skipWhitespaces keeps the single
-			// space that usually separates two attributes call-free.
-			buf := thiz.rb[thiz.r:thiz.w]
-			p := indexNonSpaceHead(buf)
-			if p >= 0 {
-				b = buf[p]
-				thiz.r += p + 1
-			} else {
-				var err error
-				b, err = thiz.skipWhitespacesSlow()
-				if err != nil {
-					return err
-				}
-			}
-		}
+	if b > ' ' {
 		if b == '/' || b == '>' {
-			// The terminator is consumed here instead of being read and
-			// dispatched on again by the next NextToken call. A "/" leaves
-			// an EndElement pending; offAdjust keeps InputOffset reporting
-			// the terminator's own position in the meantime.
-			thiz.offAdjust = -1
-			thiz.pendingSelfClose = b == '/'
-			t.Attr = thiz.attrs[i:]
+			thiz.endStartElement(b, t, i)
 			return nil
+		}
+		// Malformed: some other separator ended the name. Let the attribute
+		// name start at it, as it always has.
+		thiz.r--
+	}
+	for {
+		// Find the next significant byte. Doing the scan here rather than
+		// through readByte plus skipWhitespaces keeps the single space that
+		// usually separates two attributes call-free.
+		buf := thiz.rb[thiz.r:thiz.w]
+		if p := indexNonSpaceHead(buf); p >= 0 {
+			b = buf[p]
+			if b == '/' || b == '>' {
+				thiz.r += p + 1
+				thiz.endStartElement(b, t, i)
+				return nil
+			}
+			thiz.r += p
+		} else {
+			var err error
+			b, err = thiz.skipWhitespacesSlow()
+			if err != nil {
+				return err
+			}
+			if b == '/' || b == '>' {
+				thiz.endStartElement(b, t, i)
+				return nil
+			}
+			thiz.unreadByte()
 		}
 		// Extend by one without writing a zero Attr first: decodeAttribute
 		// assigns every field of it anyway, and an Attr is 80 bytes.
@@ -809,17 +835,14 @@ func (thiz *decoder) decodeAttributes(b byte, t *Token) error {
 			return err
 		}
 		thiz.numAttributes[thiz.top]++
-		// Scan on from the input for the next attribute or the terminator.
-		b = ' '
 	}
 }
 
-// decodeAttribute parses a single XML attribute.
-// After this function returns, the next reader symbol
+// decodeAttribute parses a single XML attribute, whose first byte is the next
+// unread one. After this function returns, the next reader symbol
 // is the byte after the closing single or double quote
 // of the attribute's value.
 func (thiz *decoder) decodeAttribute(attr *Attr) error {
-	thiz.unreadByte()
 	b, err := thiz.readName(&attr.Name)
 	if err != nil {
 		return err
