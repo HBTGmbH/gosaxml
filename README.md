@@ -21,6 +21,8 @@ go get -u github.com/HBTGmbH/gosaxml
 * zero-allocation stream encoding of XML elements (to `io.Writer`)
 * tidying of XML namespace declarations of the encoder input
 * CDATA sections are decoded as `TokenTypeCharData` and encoded back as CDATA
+* SIMD-accelerated scanning on amd64 (SSE2/AVX2) and arm64 (NEON), with a portable
+  fallback on every other architecture
 
 # Limitations
 

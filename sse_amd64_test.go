@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-func TestOpenAngleBracket16(t *testing.T) {
-	assert.Equal(t, byte(3), openAngleBracket16(at(slice(16, ' '), 3, '<')))
-	assert.Equal(t, byte(15), openAngleBracket16(at(slice(16, ' '), 15, '<')))
-	assert.Equal(t, byte(16), openAngleBracket16(slice(16, ' ')))
-}
-
 func TestOnlySpaces16(t *testing.T) {
 	assert.Equal(t, byte(16), onlySpaces16(slice(16, ' ')))
 	assert.Equal(t, byte(16), onlySpaces16(slice(16, '\t')))

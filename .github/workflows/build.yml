@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: reviewdog/action-golangci-lint@c76cceaaab89abe74e649d2e34c6c9adc26662d2 # v2.10.0
+      - uses: reviewdog/action-golangci-lint@284129a3ac23bc5d8ac1522e0b6511df74a8836d # v2.10.2
         with:
           fail_level: any
       - run: |
@@ -41,7 +41,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        go: [ '1.24', '1.25', '1.26' ]
+        go: [ '1.26', '1.27' ]
         os: [ 'windows', 'linux' ]
         arch: [ 'amd64', 'arm64' ]
     name: Go ${{ matrix.go }}-${{ matrix.os }}-${{ matrix.arch }} build
@@ -60,7 +60,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        go: [ '1.24', '1.25', '1.26' ]
+        go: [ '1.26', '1.27' ]
     name: Go ${{ matrix.go }} test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
