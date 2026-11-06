@@ -181,6 +181,17 @@ func (thiz *decoder) readByteSlow() (byte, error) {
 	return c, nil
 }
 
+// fill reads until at least one unconsumed byte is available.
+func (thiz *decoder) fill() error {
+	for thiz.r == thiz.w {
+		err := thiz.read0()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (thiz *decoder) discardBuffer() {
 	thiz.r = thiz.w
 }
@@ -230,18 +241,39 @@ func (thiz *decoder) NextToken(t *Token) error {
 		return thiz.decodeEndElement(t)
 	}
 	for {
-		// read next character
-		b, ok := thiz.readByteFast()
-		var err error
-		if !ok {
-			b, err = thiz.readByteSlow()
-			if err != nil {
+		// Peek at the next byte rather than consuming it: text and start
+		// elements want it left unread, and consuming it only to give it back
+		// would put two more store/load round trips of thiz.r on the critical
+		// path of every token.
+		j := thiz.r
+		if j >= thiz.w {
+			if err := thiz.fill(); err != nil {
 				return err
 			}
+			continue
 		}
-		switch b {
+		switch thiz.rb[j] {
 		case '<':
-			b, ok = thiz.readByteFast()
+			// Likewise, the byte after '<' starts the element name of a start
+			// element, the most common markup, so it is left for readName;
+			// for an end element both bytes are consumed in one step.
+			if j+1 < thiz.w {
+				switch thiz.rb[j+1] {
+				case '?', '!':
+				case '/':
+					thiz.r = j + 2
+					if _, err := thiz.readName(&t.Name); err != nil {
+						return err
+					}
+					return thiz.decodeEndElement(t)
+				default:
+					thiz.r = j + 1
+					return thiz.decodeStartElement(t)
+				}
+			}
+			thiz.r = j + 1
+			b, ok := thiz.readByteFast()
+			var err error
 			if !ok {
 				b, err = thiz.readByteSlow()
 				if err != nil {
@@ -275,12 +307,13 @@ func (thiz *decoder) NextToken(t *Token) error {
 				}
 				return thiz.decodeEndElement(t)
 			default:
+				thiz.unreadByte()
 				return thiz.decodeStartElement(t)
 			}
 		case '>':
 			// A ">" that does not close any markup we opened. Skip it.
+			thiz.r = j + 1
 		default:
-			thiz.unreadByte()
 			cntn, err := thiz.decodeText(t)
 			if err != nil || !cntn {
 				return err
@@ -403,7 +436,6 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 	// inherit xml:space handling from the parent element (may be
 	// overridden by an xml:space attribute in decodeAttribute)
 	thiz.preserveWhitespaces[thiz.top] = thiz.preserveWhitespaces[thiz.top-1]
-	thiz.unreadByte()
 	b, err := thiz.readName(&t.Name)
 	if err != nil {
 		return err
