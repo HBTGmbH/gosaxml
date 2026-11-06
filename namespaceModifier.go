@@ -24,10 +24,6 @@ type NamespaceModifier struct {
 	PreserveOriginalPrefixes bool
 }
 
-var (
-	bsxmlns = []byte("xmlns")
-)
-
 // NewNamespaceModifier creates a new NamespaceModifier and returns a pointer to it.
 func NewNamespaceModifier() *NamespaceModifier {
 	return &NamespaceModifier{
@@ -111,7 +107,7 @@ func (thiz *NamespaceModifier) processElementName(t *Token) {
 func (thiz *NamespaceModifier) findNamespaceForPrefix(prefix []byte) []byte {
 	// scan all frames up to the top
 	for i := len(thiz.namespaces)/2 - 1; i >= 0; i-- {
-		if bytes.Equal(thiz.namespaces[2*i], prefix) {
+		if equalShort(thiz.namespaces[2*i], prefix) {
 			return thiz.namespaces[2*i+1]
 		}
 	}
@@ -136,11 +132,26 @@ func (thiz *NamespaceModifier) findPrefixForNamespace(namespace []byte) []byte {
 func (thiz *NamespaceModifier) findPrefixAlias(prefix []byte) []byte {
 	// scan all frames up to the top
 	for i := len(thiz.prefixAliases)/2 - 1; i >= 0; i-- {
-		if bytes.Equal(thiz.prefixAliases[2*i], prefix) {
+		if equalShort(thiz.prefixAliases[2*i], prefix) {
 			return thiz.prefixAliases[2*i+1]
 		}
 	}
 	return nil
+}
+
+// equalShort reports whether a and b hold the same bytes. Prefixes are a few
+// bytes long, and for those comparing inline beats the runtime.memequal call
+// that bytes.Equal turns into.
+func equalShort(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (thiz *NamespaceModifier) pushFrame() error {
@@ -173,7 +184,9 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) error {
 	for i := 0; i < len(t.Attr); i++ {
 		attr := &t.Attr[i]
 		// check for advertized namespaces in attributes
-		if bytes.Equal(attr.Name.Prefix, bsxmlns) { // <- xmlns:prefix
+		// Comparing against a constant string compiles to inline loads
+		// instead of a runtime.memequal call.
+		if string(attr.Name.Prefix) == "xmlns" { // <- xmlns:prefix
 			// this element introduces a new namespace that binds to a prefix
 			// check if we already know this namespace by this or another prefix
 			prefix := thiz.findPrefixForNamespace(attr.Value)
@@ -198,7 +211,7 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) error {
 			} else {
 				thiz.addNamespaceBinding(attr.Name.Local, attr.Value)
 			}
-		} else if attr.Name.Prefix == nil && bytes.Equal(attr.Name.Local, bsxmlns) {
+		} else if attr.Name.Prefix == nil && string(attr.Name.Local) == "xmlns" {
 			// check if the element is already in that namespace, in which case
 			// we can simply omit the namespace.
 			currentNamespace := thiz.findNamespaceForPrefix(nil)
