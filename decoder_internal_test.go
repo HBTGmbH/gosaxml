@@ -81,3 +81,17 @@ func TestAttrSlotReuseClearsPrefix(t *testing.T) {
 		}
 	}
 }
+
+// TestNamespaceAliasesFitBlockCopy guards the slack behind the one-letter
+// namespace aliases: without it, appendBlock declines them and every rewritten
+// prefix is written through runtime.memmove.
+func TestNamespaceAliasesFitBlockCopy(t *testing.T) {
+	if len(namespaceAliases) != 26 {
+		t.Fatalf("len(namespaceAliases) = %d, want 26", len(namespaceAliases))
+	}
+	for i := range namespaceAliases {
+		if c := cap(namespaceAliases[i : i+1]); c < encodeBlock {
+			t.Fatalf("cap(namespaceAliases[%d:%d]) = %d, want >= %d", i, i+1, c, encodeBlock)
+		}
+	}
+}
