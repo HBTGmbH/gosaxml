@@ -1,6 +1,7 @@
 package gosaxml
 
 import (
+	"bytes"
 	"errors"
 	"io"
 )
@@ -13,6 +14,8 @@ var (
 	// constant strings needed here and there
 	angleOpenQuest  = []byte("<?")
 	questAngleClose = []byte("?>")
+	cdataStart      = []byte("<![CDATA[")
+	cdataEnd        = []byte("]]>")
 )
 
 // EncoderMiddleware allows to pre-process a Token before
@@ -152,6 +155,12 @@ func (thiz *Encoder) EncodeToken(t *Token) error {
 		thiz.lastStartElement = false
 	case TokenTypeProcInst:
 		err := thiz.encodeProcInst(t)
+		if err != nil {
+			return err
+		}
+		thiz.lastStartElement = false
+	case TokenTypeCharData:
+		err := thiz.encodeCharData(t.ByteData)
 		if err != nil {
 			return err
 		}
@@ -338,5 +347,38 @@ func (thiz *Encoder) encodeProcInst(t *Token) error {
 	buf = append(buf, ' ')
 	buf = append(buf, t.ByteData...)
 	thiz.buf = append(buf, questAngleClose...)
+	return nil
+}
+
+// encodeCharData ends a pending start element and then writes data back as a
+// CDATA section, so that a document decoded and encoded again keeps its CDATA
+// sections.
+func (thiz *Encoder) encodeCharData(data []byte) error {
+	// A CDATA section cannot contain "]]>". Every occurrence ends the section
+	// between its "]]" and ">" and starts a new one, keeping the text itself
+	// unchanged. "]]>" cannot overlap itself, so Count finds every split.
+	splits := bytes.Count(data, cdataEnd)
+	err := thiz.reserve(1 + len(cdataStart) + len(data) + len(cdataEnd) +
+		splits*(len(cdataEnd)+len(cdataStart)))
+	if err != nil {
+		return err
+	}
+	buf := thiz.buf
+	if thiz.lastStartElement {
+		buf = append(buf, '>')
+	}
+	buf = append(buf, cdataStart...)
+	for {
+		k := bytes.Index(data, cdataEnd)
+		if k < 0 {
+			break
+		}
+		buf = append(buf, data[:k+2]...)
+		buf = append(buf, cdataEnd...)
+		buf = append(buf, cdataStart...)
+		data = data[k+2:]
+	}
+	buf = append(buf, data...)
+	thiz.buf = append(buf, cdataEnd...)
 	return nil
 }

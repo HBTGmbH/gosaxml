@@ -66,7 +66,7 @@ func buildElement(i int, b *bytes.Buffer, r *rand.Rand, lastOpen bool) bool {
 			_, _ = b.WriteString(" ")
 			buildAttribute(b, r)
 		}
-		ended := buildElement(r.Intn(2), b, r, true)
+		ended := buildElement(r.Intn(3), b, r, true)
 		if !ended {
 			_, _ = b.WriteString("</")
 			_, _ = b.WriteString(name)
@@ -78,6 +78,15 @@ func buildElement(i int, b *bytes.Buffer, r *rand.Rand, lastOpen bool) bool {
 			_, _ = b.WriteString(">")
 		}
 		_, _ = b.WriteString(randText(r))
+		return false
+	case 2:
+		if lastOpen {
+			_, _ = b.WriteString(">")
+		}
+		// randText never yields ">", so the text can never contain "]]>"
+		_, _ = b.WriteString("<![CDATA[")
+		_, _ = b.WriteString(randText(r))
+		_, _ = b.WriteString("]]>")
 		return false
 	default:
 		_, _ = b.WriteString("/>")
