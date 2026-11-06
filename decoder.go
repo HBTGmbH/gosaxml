@@ -97,9 +97,11 @@ func (thiz *decoder) appendFast(src []byte) bool {
 	if len(src) > overcopy || l+overcopy > cap(thiz.bb) {
 		return false
 	}
-	bb := thiz.bb[:l+overcopy]
-	*(*[overcopy]byte)(bb[l:]) = *(*[overcopy]byte)(src[:overcopy])
-	thiz.bb = bb[:l+len(src)]
+	*(*[overcopy]byte)(thiz.bb[l : l+overcopy]) = *(*[overcopy]byte)(src[:overcopy])
+	// Reslicing thiz.bb in place only stores the new length; assigning a
+	// reslice of a local copy would store the pointer too, with a write
+	// barrier.
+	thiz.bb = thiz.bb[:l+len(src)]
 	return true
 }
 
