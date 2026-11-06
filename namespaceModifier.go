@@ -24,10 +24,6 @@ type NamespaceModifier struct {
 	PreserveOriginalPrefixes bool
 }
 
-var (
-	bsxmlns = []byte("xmlns")
-)
-
 // NewNamespaceModifier creates a new NamespaceModifier and returns a pointer to it.
 func NewNamespaceModifier() *NamespaceModifier {
 	return &NamespaceModifier{
@@ -60,14 +56,20 @@ func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
 		if err != nil {
 			return err
 		}
-		err = thiz.processNamespaces(t)
-		if err != nil {
-			return err
+		if len(t.Attr) > 0 {
+			err = thiz.processNamespaces(t)
+			if err != nil {
+				return err
+			}
 		}
-		thiz.processElementName(t)
+		if len(thiz.prefixAliases) > 0 {
+			thiz.rewritePrefixes(t)
+		}
 		thiz.openNames[thiz.top] = t.Name
 	case TokenTypeEndElement:
-		thiz.processElementName(t)
+		// an end element is written with the (possibly rewritten) name of
+		// the element it closes
+		t.Name = thiz.openNames[thiz.top]
 		err := thiz.popFrame()
 		if err != nil {
 			return err
@@ -76,32 +78,27 @@ func (thiz *NamespaceModifier) EncodeToken(t *Token) error {
 	return nil
 }
 
-func (thiz *NamespaceModifier) processElementName(t *Token) {
-	if t.Kind == TokenTypeStartElement {
-		if len(thiz.prefixAliases) > 0 {
-			// check attributes for rewritten prefixes
-			for i := 0; i < len(t.Attr); i++ {
-				attr := &t.Attr[i]
-				// Unprefixed attributes are never in the default namespace
-				// (https://www.w3.org/TR/xml-names/#defaulting), so a
-				// rewrite of the default namespace to a prefix must not
-				// be applied to them.
-				if len(attr.Name.Prefix) == 0 {
-					continue
-				}
-				prefix := thiz.findPrefixAlias(attr.Name.Prefix)
-				if prefix != nil {
-					attr.Name.Prefix = prefix
-				}
-			}
-			// Did we rewrite the element name prefix?
-			prefix := thiz.findPrefixAlias(t.Name.Prefix)
-			if prefix != nil {
-				t.Name.Prefix = prefix
-			}
+// rewritePrefixes applies the prefix rewrites in scope to the name and the
+// attribute names of the start element t.
+func (thiz *NamespaceModifier) rewritePrefixes(t *Token) {
+	// check attributes for rewritten prefixes
+	for i := 0; i < len(t.Attr); i++ {
+		attr := &t.Attr[i]
+		// Unprefixed attributes are never in the default namespace
+		// (https://www.w3.org/TR/xml-names/#defaulting), so a rewrite of the
+		// default namespace to a prefix must not be applied to them.
+		if len(attr.Name.Prefix) == 0 {
+			continue
 		}
-	} else if t.Kind == TokenTypeEndElement {
-		t.Name = thiz.openNames[thiz.top]
+		prefix := thiz.findPrefixAlias(attr.Name.Prefix)
+		if prefix != nil {
+			attr.Name.Prefix = prefix
+		}
+	}
+	// Did we rewrite the element name prefix?
+	prefix := thiz.findPrefixAlias(t.Name.Prefix)
+	if prefix != nil {
+		t.Name.Prefix = prefix
 	}
 }
 
@@ -111,7 +108,7 @@ func (thiz *NamespaceModifier) processElementName(t *Token) {
 func (thiz *NamespaceModifier) findNamespaceForPrefix(prefix []byte) []byte {
 	// scan all frames up to the top
 	for i := len(thiz.namespaces)/2 - 1; i >= 0; i-- {
-		if bytes.Equal(thiz.namespaces[2*i], prefix) {
+		if equalShort(thiz.namespaces[2*i], prefix) {
 			return thiz.namespaces[2*i+1]
 		}
 	}
@@ -136,11 +133,26 @@ func (thiz *NamespaceModifier) findPrefixForNamespace(namespace []byte) []byte {
 func (thiz *NamespaceModifier) findPrefixAlias(prefix []byte) []byte {
 	// scan all frames up to the top
 	for i := len(thiz.prefixAliases)/2 - 1; i >= 0; i-- {
-		if bytes.Equal(thiz.prefixAliases[2*i], prefix) {
+		if equalShort(thiz.prefixAliases[2*i], prefix) {
 			return thiz.prefixAliases[2*i+1]
 		}
 	}
 	return nil
+}
+
+// equalShort reports whether a and b hold the same bytes. Prefixes are a few
+// bytes long, and for those comparing inline beats the runtime.memequal call
+// that bytes.Equal turns into.
+func equalShort(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (thiz *NamespaceModifier) pushFrame() error {
@@ -173,7 +185,9 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) error {
 	for i := 0; i < len(t.Attr); i++ {
 		attr := &t.Attr[i]
 		// check for advertized namespaces in attributes
-		if bytes.Equal(attr.Name.Prefix, bsxmlns) { // <- xmlns:prefix
+		// Comparing against a constant string compiles to inline loads
+		// instead of a runtime.memequal call.
+		if string(attr.Name.Prefix) == "xmlns" { // <- xmlns:prefix
 			// this element introduces a new namespace that binds to a prefix
 			// check if we already know this namespace by this or another prefix
 			prefix := thiz.findPrefixForNamespace(attr.Value)
@@ -198,7 +212,7 @@ func (thiz *NamespaceModifier) processNamespaces(t *Token) error {
 			} else {
 				thiz.addNamespaceBinding(attr.Name.Local, attr.Value)
 			}
-		} else if attr.Name.Prefix == nil && bytes.Equal(attr.Name.Local, bsxmlns) {
+		} else if attr.Name.Prefix == nil && string(attr.Name.Local) == "xmlns" {
 			// check if the element is already in that namespace, in which case
 			// we can simply omit the namespace.
 			currentNamespace := thiz.findNamespaceForPrefix(nil)

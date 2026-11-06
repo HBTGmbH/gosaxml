@@ -8,8 +8,11 @@ import (
 
 // pre-allocate all constant byte slices that we write
 var (
-	// all characters used to build new namespace aliases
-	namespaceAliases = []byte("abcdefghijklmnopqrstuvwxyz")
+	// All characters used to build new namespace aliases. The backing array
+	// has encodeBlock bytes of slack beyond them, so that every one-letter
+	// alias sliced from it is long enough for appendBlock's block copy;
+	// otherwise each rewritten prefix would be written via runtime.memmove.
+	namespaceAliases = []byte("abcdefghijklmnopqrstuvwxyz" + string(make([]byte, encodeBlock)))[:26]
 
 	// constant strings needed here and there
 	angleOpenQuest  = []byte("<?")

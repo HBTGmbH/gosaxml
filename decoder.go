@@ -97,9 +97,11 @@ func (thiz *decoder) appendFast(src []byte) bool {
 	if len(src) > overcopy || l+overcopy > cap(thiz.bb) {
 		return false
 	}
-	bb := thiz.bb[:l+overcopy]
-	*(*[overcopy]byte)(bb[l:]) = *(*[overcopy]byte)(src[:overcopy])
-	thiz.bb = bb[:l+len(src)]
+	*(*[overcopy]byte)(thiz.bb[l : l+overcopy]) = *(*[overcopy]byte)(src[:overcopy])
+	// Reslicing thiz.bb in place only stores the new length; assigning a
+	// reslice of a local copy would store the pointer too, with a write
+	// barrier.
+	thiz.bb = thiz.bb[:l+len(src)]
 	return true
 }
 
@@ -181,6 +183,17 @@ func (thiz *decoder) readByteSlow() (byte, error) {
 	return c, nil
 }
 
+// fill reads until at least one unconsumed byte is available.
+func (thiz *decoder) fill() error {
+	for thiz.r == thiz.w {
+		err := thiz.read0()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (thiz *decoder) discardBuffer() {
 	thiz.r = thiz.w
 }
@@ -230,18 +243,39 @@ func (thiz *decoder) NextToken(t *Token) error {
 		return thiz.decodeEndElement(t)
 	}
 	for {
-		// read next character
-		b, ok := thiz.readByteFast()
-		var err error
-		if !ok {
-			b, err = thiz.readByteSlow()
-			if err != nil {
+		// Peek at the next byte rather than consuming it: text and start
+		// elements want it left unread, and consuming it only to give it back
+		// would put two more store/load round trips of thiz.r on the critical
+		// path of every token.
+		j := thiz.r
+		if j >= thiz.w {
+			if err := thiz.fill(); err != nil {
 				return err
 			}
+			continue
 		}
-		switch b {
+		switch thiz.rb[j] {
 		case '<':
-			b, ok = thiz.readByteFast()
+			// Likewise, the byte after '<' starts the element name of a start
+			// element, the most common markup, so it is left for readName;
+			// for an end element both bytes are consumed in one step.
+			if j+1 < thiz.w {
+				switch thiz.rb[j+1] {
+				case '?', '!':
+				case '/':
+					thiz.r = j + 2
+					if _, err := thiz.readName(&t.Name); err != nil {
+						return err
+					}
+					return thiz.decodeEndElement(t)
+				default:
+					thiz.r = j + 1
+					return thiz.decodeStartElement(t)
+				}
+			}
+			thiz.r = j + 1
+			b, ok := thiz.readByteFast()
+			var err error
 			if !ok {
 				b, err = thiz.readByteSlow()
 				if err != nil {
@@ -275,12 +309,13 @@ func (thiz *decoder) NextToken(t *Token) error {
 				}
 				return thiz.decodeEndElement(t)
 			default:
+				thiz.unreadByte()
 				return thiz.decodeStartElement(t)
 			}
 		case '>':
 			// A ">" that does not close any markup we opened. Skip it.
+			thiz.r = j + 1
 		default:
-			thiz.unreadByte()
 			cntn, err := thiz.decodeText(t)
 			if err != nil || !cntn {
 				return err
@@ -403,13 +438,14 @@ func (thiz *decoder) decodeStartElement(t *Token) error {
 	// inherit xml:space handling from the parent element (may be
 	// overridden by an xml:space attribute in decodeAttribute)
 	thiz.preserveWhitespaces[thiz.top] = thiz.preserveWhitespaces[thiz.top-1]
-	thiz.unreadByte()
 	b, err := thiz.readName(&t.Name)
 	if err != nil {
 		return err
 	}
-	err = thiz.decodeAttributes(b, t)
-	if err != nil {
+	if b == '>' || b == '/' {
+		// no attributes: spare the call into decodeAttributes
+		thiz.endStartElement(b, t, len(thiz.attrs))
+	} else if err = thiz.decodeAttributes(b, t); err != nil {
 		return err
 	}
 	if thiz.pendingSelfClose {
@@ -732,37 +768,61 @@ func (thiz *decoder) skipWhitespacesSlow() (byte, error) {
 	}
 }
 
+// endStartElement completes t once the "/" or ">" that ends its start tag has
+// been consumed; i is the index of its first attribute in thiz.attrs.
+//
+// The terminator is consumed right away instead of being read and dispatched
+// on again by the next NextToken call. A "/" leaves an EndElement pending;
+// offAdjust keeps InputOffset reporting the terminator's own position in the
+// meantime.
+func (thiz *decoder) endStartElement(b byte, t *Token, i int) {
+	thiz.offAdjust = -1
+	thiz.pendingSelfClose = b == '/'
+	t.Attr = thiz.attrs[i:]
+}
+
 // decodeAttributes parses the attributes of a start element and stores them
-// in t.Attr. b is the byte that terminated the element name.
+// in t.Attr. b is the byte that terminated the element name, which has been
+// consumed.
+//
+// Each attribute's first byte is left unread for decodeAttribute rather than
+// consumed and given back, which would cost a store/load round trip of
+// thiz.r per attribute.
 func (thiz *decoder) decodeAttributes(b byte, t *Token) error {
 	i := len(thiz.attrs)
-	for {
-		if b <= ' ' {
-			// Find the next significant byte. Doing the scan here rather
-			// than through readByte plus skipWhitespaces keeps the single
-			// space that usually separates two attributes call-free.
-			buf := thiz.rb[thiz.r:thiz.w]
-			p := indexNonSpaceHead(buf)
-			if p >= 0 {
-				b = buf[p]
-				thiz.r += p + 1
-			} else {
-				var err error
-				b, err = thiz.skipWhitespacesSlow()
-				if err != nil {
-					return err
-				}
-			}
-		}
+	if b > ' ' {
 		if b == '/' || b == '>' {
-			// The terminator is consumed here instead of being read and
-			// dispatched on again by the next NextToken call. A "/" leaves
-			// an EndElement pending; offAdjust keeps InputOffset reporting
-			// the terminator's own position in the meantime.
-			thiz.offAdjust = -1
-			thiz.pendingSelfClose = b == '/'
-			t.Attr = thiz.attrs[i:]
+			thiz.endStartElement(b, t, i)
 			return nil
+		}
+		// Malformed: some other separator ended the name. Let the attribute
+		// name start at it, as it always has.
+		thiz.r--
+	}
+	for {
+		// Find the next significant byte. Doing the scan here rather than
+		// through readByte plus skipWhitespaces keeps the single space that
+		// usually separates two attributes call-free.
+		buf := thiz.rb[thiz.r:thiz.w]
+		if p := indexNonSpaceHead(buf); p >= 0 {
+			b = buf[p]
+			if b == '/' || b == '>' {
+				thiz.r += p + 1
+				thiz.endStartElement(b, t, i)
+				return nil
+			}
+			thiz.r += p
+		} else {
+			var err error
+			b, err = thiz.skipWhitespacesSlow()
+			if err != nil {
+				return err
+			}
+			if b == '/' || b == '>' {
+				thiz.endStartElement(b, t, i)
+				return nil
+			}
+			thiz.unreadByte()
 		}
 		// Extend by one without writing a zero Attr first: decodeAttribute
 		// assigns every field of it anyway, and an Attr is 80 bytes.
@@ -777,17 +837,14 @@ func (thiz *decoder) decodeAttributes(b byte, t *Token) error {
 			return err
 		}
 		thiz.numAttributes[thiz.top]++
-		// Scan on from the input for the next attribute or the terminator.
-		b = ' '
 	}
 }
 
-// decodeAttribute parses a single XML attribute.
-// After this function returns, the next reader symbol
+// decodeAttribute parses a single XML attribute, whose first byte is the next
+// unread one. After this function returns, the next reader symbol
 // is the byte after the closing single or double quote
 // of the attribute's value.
 func (thiz *decoder) decodeAttribute(attr *Attr) error {
-	thiz.unreadByte()
 	b, err := thiz.readName(&attr.Name)
 	if err != nil {
 		return err
